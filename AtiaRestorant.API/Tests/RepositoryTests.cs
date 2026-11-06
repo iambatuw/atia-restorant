@@ -1,0 +1,388 @@
+using AtiaRestorant.API.Data;
+using AtiaRestorant.API.Models;
+using Xunit;
+
+namespace AtiaRestorant.API.Tests;
+
+public sealed class RepositoryTests
+{
+    private static readonly StaffActor Admin = new(1, "Admin", "Admin");
+    private static readonly StaffActor Waiter = new(2, "Waiter", "Garson");
+    private static readonly StaffActor Cook = new(3, "Cook", "Mutfak");
+    private static RestaurantRepository Repository() => new(new BackendMode(true), TimeProvider.System);
+    private static SiparisEkleRequest Order(long table = 12, decimal quantity = 1) =>
+        new() { MasaKayitNo = table, StokKayitNo = 4, Miktar = quantity, BirimFiyat = 0.01m, PersonelKayitNo = 999 };
+
+    [Fact]
+    public async Task ConcurrentOrdersCreateExactlyOneReceiptWithNoLostLines()
+    {
+        var repository = Repository();
+        await Task.WhenAll(Enumerable.Range(0, 100).Select(_ => Task.Run(() => repository.AddOrder(Order(), Waiter))));
+        var receipt = repository.Receipt(12)!;
+        Assert.Equal(100, receipt.Detaylar.Count);
+        Assert.Equal(100, receipt.Detaylar.Select(d => d.KayitNo).Distinct().Count());
+        Assert.Equal(32000m, receipt.GenelToplam);
+        // A caller cannot mutate repository state through returned DTOs.
+        receipt.Detaylar.Clear();
+        Assert.Equal(100, repository.Receipt(12)!.Detaylar.Count);
+    }
+
+    [Fact]
+    public void PricesAndPersonnelAreServerAuthoritativeIncludingPortions()
+    {
+        var repository = Repository();
+        var request = Order();
+        request.PorsiyonKayitNo = 41;
+        var line = Assert.Single(repository.AddOrder(request, Waiter).Detaylar);
+        Assert.Equal(192m, line.BirimFiyat);
+        Assert.Equal(192m, line.SatirTutari);
+        Assert.Equal(Waiter.Id, line.PersonelKayitNo);
+        Assert.Equal(Waiter.Name, line.PersonelAdi);
+        request.PorsiyonKayitNo = 999;
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.AddOrder(request, Waiter)).Status);
+        request.PorsiyonKayitNo = null;
+        request.Ikram = true;
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.AddOrder(request, Waiter)).Status);
+    }
+
+    [Fact]
+    public async Task PaymentRejectsMismatchNegativeStaleAndConcurrentDuplicates()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(), Waiter);
+        var payment = new OdemeRequest { BaslikKayitNo = receipt.KayitNo, NakitTutar = 319.99m };
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Pay(12, payment, Admin)).Status);
+        payment.NakitTutar = -1;
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.Pay(12, payment, Admin)).Status);
+        payment.NakitTutar = 320;
+        payment.BaslikKayitNo++;
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Pay(12, payment, Admin)).Status);
+        payment.BaslikKayitNo = receipt.KayitNo;
+        var results = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() =>
+        {
+            try { repository.Pay(12, payment, Admin); return 200; }
+            catch (ApiException exception) { return exception.Status; }
+        })));
+        Assert.Single(results, status => status == 200);
+        Assert.Equal(19, results.Count(status => status == 409));
+        Assert.Null(repository.Receipt(12));
+        // Even after a new receipt opens, the old header cannot pay for it.
+        repository.AddOrder(Order(), Waiter);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Pay(12, payment, Admin)).Status);
+    }
+
+    [Fact]
+    public void KitchenReadinessNeverUsesPrintCountAndIncreasesReturnTicket()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(quantity: 2), Waiter);
+        var line = Assert.Single(receipt.Detaylar);
+        repository.MarkReady(receipt.KayitNo, Cook);
+        Assert.DoesNotContain(repository.Kitchen(), k => k.BaslikKayitNo == receipt.KayitNo);
+        Assert.Null(repository.Receipt(12)!.Detaylar[0].YazdirilanMiktar);
+        repository.UpdateOrder(line.KayitNo, new() { Miktar = 3 }, Waiter);
+        var row = Assert.Single(repository.Kitchen().Single(k => k.BaslikKayitNo == receipt.KayitNo).Satirlar);
+        Assert.Equal(2m, row.HazirMiktar); Assert.Equal(1m, row.KalanMiktar); Assert.False(row.Hazir);
+        Assert.Equal(0m, row.YazdirilanMiktar);
+        repository.UpdateOrder(line.KayitNo, new() { Miktar = 1 }, Waiter);
+        repository.UpdateOrder(line.KayitNo, new() { Miktar = 2 }, Waiter);
+        row = Assert.Single(repository.Kitchen().Single(k => k.BaslikKayitNo == receipt.KayitNo).Satirlar);
+        Assert.Equal(1m, row.HazirMiktar); Assert.Equal(1m, row.KalanMiktar);
+        repository.MarkReady(receipt.KayitNo, Cook);
+        repository.AddOrder(Order(), Waiter);
+        Assert.Contains(repository.Kitchen(), k => k.BaslikKayitNo == receipt.KayitNo);
+    }
+
+    [Fact]
+    public void ReservationValidationRejectsMissingPastInvalidAndOverlappingRequests()
+    {
+        var repository = Repository();
+        var request = new RezervasyonEkleRequest { MasaKayitNo = 12, MusteriAdi = "Ada Yılmaz", KisiSayisi = 4,
+            Telefon = "+90 555 123 45 67", RezervasyonTarihi = DateTime.UtcNow.AddDays(1) };
+        request.KisiSayisi = 0;
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.Reserve(request, Admin)).Status);
+        request.KisiSayisi = 4; request.MusteriAdi = " ";
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.Reserve(request, Admin)).Status);
+        request.MusteriAdi = "Ada"; request.RezervasyonTarihi = DateTime.UtcNow.AddMinutes(-1);
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.Reserve(request, Admin)).Status);
+        request.RezervasyonTarihi = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(1), DateTimeKind.Unspecified);
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.Reserve(request, Admin)).Status);
+        request.RezervasyonTarihi = DateTime.UtcNow.AddDays(1); request.Telefon = "bad phone";
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.Reserve(request, Admin)).Status);
+        request.Telefon = null;
+        var saved = repository.Reserve(request, Admin);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Reserve(request, Admin)).Status);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.Reserve(request, Waiter)).Status);
+        Assert.Equal(saved.KayitNo, repository.DeleteReservation(saved.KayitNo, Admin).KayitNo);
+        Assert.Empty(repository.Reservations(null, Admin));
+    }
+
+    [Fact]
+    public void ReportExcludesOpenReceiptsAndUsesClosedNetRevenue()
+    {
+        var repository = Repository();
+        var before = repository.DailyReport(repository.BusinessToday, Admin);
+        var receipt = repository.AddOrder(Order(), Waiter);
+        var open = repository.DailyReport(repository.BusinessToday, Admin);
+        Assert.Equal(before.ToplamCiro, open.ToplamCiro);
+        Assert.Equal(before.AcikAdisyon + 1, open.AcikAdisyon);
+        repository.Pay(12, new() { BaslikKayitNo = receipt.KayitNo, NakitTutar = 300, IndirimTutar = 20 }, Admin);
+        var closed = repository.DailyReport(repository.BusinessToday, Admin);
+        Assert.Equal(before.ToplamCiro + 300, closed.ToplamCiro);
+        Assert.Equal(closed.ToplamCiro, closed.SaatlikCiro.Sum(h => h.Ciro));
+        Assert.Equal(before.ToplamAdisyon + 1, closed.ToplamAdisyon);
+    }
+
+    [Fact]
+    public void RoleChecksApplyInsideRepositoryAndSqlFailsClosed()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(), Waiter);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.AddOrder(Order(), Cook)).Status);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.Pay(12, new(), Waiter)).Status);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.UpdateOrder(receipt.Detaylar[0].KayitNo,
+            new() { Miktar = 1, Ikram = true }, Waiter)).Status);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.MarkReady(receipt.KayitNo, Waiter)).Status);
+        var inactive = new RestaurantRepository(new(false), TimeProvider.System);
+        Assert.Equal(503, Assert.Throws<ApiException>(() => inactive.Menu()).Status);
+    }
+
+    [Fact]
+    public void ReportAndReservationDaysUseIstanbulMidnightNotUtc()
+    {
+        // 21:30 UTC on Nov 5 is 00:30 Istanbul on Nov 6.
+        var clock = new FixedClock(new DateTimeOffset(2026, 11, 5, 21, 30, 0, TimeSpan.Zero));
+        var repository = new RestaurantRepository(new(true), clock);
+        var localDay = new DateOnly(2026, 11, 6);
+        Assert.Equal(localDay, repository.BusinessToday);
+        var report = repository.DailyReport(localDay, Admin);
+        Assert.Equal(480m, report.ToplamCiro); // Closed demo receipt.
+        Assert.Equal(0, Assert.Single(report.SaatlikCiro).Saat);
+        Assert.Equal(0m, repository.DailyReport(localDay.AddDays(-1), Admin).ToplamCiro);
+        var reservation = repository.Reserve(new() { MasaKayitNo = 12, MusteriAdi = "Ada", KisiSayisi = 2,
+            RezervasyonTarihi = new DateTime(2026, 11, 6, 22, 0, 0, DateTimeKind.Utc) }, Admin);
+        Assert.Empty(repository.Reservations(localDay, Admin));
+        Assert.Equal(reservation.KayitNo, Assert.Single(repository.Reservations(localDay.AddDays(1), Admin)).KayitNo);
+        Assert.Equal(DateTimeKind.Utc, reservation.RezervasyonTarihi.Kind);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    [Fact]
+    public void MoveRequiresEmptyTargetAndKeepsReceiptIdentity()
+    {
+        var repository = Repository();
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Move(new() { KaynakMasaKayitNo = 1, HedefMasaKayitNo = 3 }, Admin)).Status);
+        var original = repository.Receipt(1)!;
+        var moved = repository.Move(new() { KaynakMasaKayitNo = 1, HedefMasaKayitNo = 12 }, Admin);
+        Assert.Null(repository.Receipt(1));
+        Assert.Equal(original.KayitNo, moved.KayitNo);
+        Assert.Equal(12L, moved.MasaKayitNo);
+        Assert.Equal(original.GenelToplam, moved.GenelToplam);
+    }
+
+    [Fact]
+    public void SplitSeparatesLinesWithoutMutatingOpenStatusAndCalculatesTotalsCorrectly()
+    {
+        var repository = Repository();
+        // Add two different items to Table 12
+        var order1 = repository.AddOrder(new() { MasaKayitNo = 12, StokKayitNo = 1, Miktar = 2 }, Waiter); // Mercimek Çorbası 2 x 95 = 190
+        var order2 = repository.AddOrder(new() { MasaKayitNo = 12, StokKayitNo = 4, Miktar = 1 }, Waiter); // Izgara Köfte 1 x 320 = 320
+        var sourceReceipt = repository.Receipt(12)!;
+        Assert.Equal(510m, sourceReceipt.GenelToplam);
+        Assert.Equal(2, sourceReceipt.Detaylar.Count);
+
+        var corbaLine = sourceReceipt.Detaylar.First(d => d.StokKayitNo == 1);
+        var kofteLine = sourceReceipt.Detaylar.First(d => d.StokKayitNo == 4);
+
+        // Split 1 çorba to empty Table 11
+        var splitRequest = new MasaAyirRequest
+        {
+            MasaKayitNo = 12,
+            HedefMasaKayitNo = 11,
+            AyrilanSatirlar = [new() { DetayKayitNo = corbaLine.KayitNo, Miktar = 1 }]
+        };
+
+        var result = repository.Split(splitRequest, Admin);
+        Assert.NotNull(result.KaynakAdisyon);
+        Assert.NotNull(result.HedefAdisyon);
+
+        // Source table (12) now has: 1 çorba (95) + 1 köfte (320) = 415
+        var updatedSource = repository.Receipt(12)!;
+        Assert.Equal(415m, updatedSource.GenelToplam);
+        Assert.False(updatedSource.Kapali);
+        var remainingCorba = Assert.Single(updatedSource.Detaylar, d => d.StokKayitNo == 1);
+        Assert.Equal(1m, remainingCorba.Miktar);
+
+        // Target table (11) now has: 1 çorba (95)
+        var targetReceipt = repository.Receipt(11)!;
+        Assert.Equal(95m, targetReceipt.GenelToplam);
+        Assert.False(targetReceipt.Kapali);
+        var splitCorba = Assert.Single(targetReceipt.Detaylar, d => d.StokKayitNo == 1);
+        Assert.Equal(1m, splitCorba.Miktar);
+
+        // Validations: cannot split to occupied table (Table 1 is occupied)
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Split(new()
+        {
+            MasaKayitNo = 12,
+            HedefMasaKayitNo = 1,
+            AyrilanSatirlar = [new() { DetayKayitNo = kofteLine.KayitNo, Miktar = 1 }]
+        }, Admin)).Status);
+
+        // Validations: cannot split all remaining lines (must use Table Move instead)
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.Split(new()
+        {
+            MasaKayitNo = 12,
+            HedefMasaKayitNo = 10,
+            AyrilanSatirlar =
+            [
+                new() { DetayKayitNo = remainingCorba.KayitNo, Miktar = 1 },
+                new() { DetayKayitNo = kofteLine.KayitNo, Miktar = 1 }
+            ]
+        }, Admin)).Status);
+    }
+
+    [Fact]
+    public void MergeCombinesReceiptsFixingLegacyNakitToplamBugAndAccumulatingAllPayments()
+    {
+        var repository = Repository();
+        // Setup: Table 11 has an order (95 TL) with partial cash (50 TL) payment
+        var r11 = repository.AddOrder(new() { MasaKayitNo = 11, StokKayitNo = 1, Miktar = 1 }, Waiter); // 95 TL
+        repository.Pay(11, new() { BaslikKayitNo = r11.KayitNo, NakitTutar = 50m, KismiOdeme = true }, Admin);
+        var r11State = repository.Receipt(11)!;
+        Assert.Equal(50m, r11State.NakitToplam);
+        Assert.False(r11State.Kapali);
+
+        // Setup: Table 12 has an order (320 TL) with partial card (100 TL), meal card (30 TL) and discount (20 TL) payment
+        var r12 = repository.AddOrder(new() { MasaKayitNo = 12, StokKayitNo = 4, Miktar = 1 }, Waiter); // 320 TL
+        repository.Pay(12, new() { BaslikKayitNo = r12.KayitNo, BankaTutar = 100m, YemekKartiTutar = 30m, IndirimTutar = 20m, KismiOdeme = true }, Admin);
+        var r12State = repository.Receipt(12)!;
+        Assert.Equal(100m, r12State.BankaToplam);
+        Assert.Equal(30m, r12State.YemekKartiToplam);
+        Assert.Equal(20m, r12State.IndirimToplam);
+        Assert.False(r12State.Kapali);
+
+        // Merge Table 11 into Table 12
+        var merged = repository.Merge(new()
+        {
+            AnaMasaKayitNo = 12,
+            BirlestirilecekMasaKayitNolar = [11]
+        }, Admin);
+
+        // Verify Legacy Bug Fix:
+        // In legacy code, NakitToplam was sequentially overwritten by BankaToplam, CariToplam, and IndirimToplam!
+        // In modernized system, each payment type accumulates independently:
+        Assert.Equal(50m, merged.NakitToplam);
+        Assert.Equal(100m, merged.BankaToplam);
+        Assert.Equal(30m, merged.YemekKartiToplam);
+        Assert.Equal(20m, merged.IndirimToplam);
+        Assert.Equal(0m, merged.CariToplam ?? 0);
+
+        // Child table 11 receipt is closed and cleared
+        Assert.Null(repository.Receipt(11));
+
+        // Master receipt has items from both tables: 95 + 320 = 415
+        Assert.Equal(415m, merged.GenelToplam);
+        Assert.Equal(2, merged.Detaylar.Count);
+    }
+
+    [Fact]
+    public void PartialPaymentAllowsIncrementalSettlementAndClosesOnlyWhenFullyPaid()
+    {
+        var repository = Repository();
+        var order = repository.AddOrder(Order(table: 12, quantity: 1), Waiter); // 320 TL
+        var receipt = repository.Receipt(12)!;
+
+        // Pay 120 TL partially with cash
+        var step1 = repository.Pay(12, new()
+        {
+            BaslikKayitNo = receipt.KayitNo,
+            NakitTutar = 120m,
+            KismiOdeme = true
+        }, Admin);
+        Assert.False(step1.Kapali);
+        Assert.Equal(120m, step1.NakitToplam);
+
+        // Attempting to pay more than remaining balance (remaining = 200 TL) fails
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Pay(12, new()
+        {
+            BaslikKayitNo = receipt.KayitNo,
+            BankaTutar = 201m,
+            KismiOdeme = true
+        }, Admin)).Status);
+
+        // Pay remaining 200 TL with card (KismiOdeme: false or true both close it if balance reaches total)
+        var step2 = repository.Pay(12, new()
+        {
+            BaslikKayitNo = receipt.KayitNo,
+            BankaTutar = 200m,
+            KismiOdeme = false
+        }, Admin);
+        Assert.True(step2.Kapali);
+        Assert.Equal(120m, step2.NakitToplam);
+        Assert.Equal(200m, step2.BankaToplam);
+        Assert.Null(repository.Receipt(12));
+    }
+
+    [Fact]
+    public void PosStateMachineManagesTerminalLifecycleAndEnforcesIdempotency()
+    {
+        var repository = Repository();
+        var order = repository.AddOrder(Order(table: 12, quantity: 1), Waiter); // 320 TL
+        var idempotencyKey = "pos-test-key-12345";
+
+        // Initiate POS transaction for Hugin S1
+        var tx = repository.PosIslemBaslat(new()
+        {
+            MasaKayitNo = 12,
+            BaslikKayitNo = order.KayitNo,
+            Tutar = 150m,
+            CihazTipi = PosCihazTipi.HuginS1,
+            IdempotencyKey = idempotencyKey
+        }, Waiter);
+
+        Assert.Equal(PosDurum.CihazaGonderildi, tx.Durum);
+        Assert.Equal(150m, tx.Tutar);
+        Assert.False(tx.Basarili);
+
+        // Re-sending with same IdempotencyKey returns identical transaction
+        var idempotentTx = repository.PosIslemBaslat(new()
+        {
+            MasaKayitNo = 12,
+            BaslikKayitNo = order.KayitNo,
+            Tutar = 150m,
+            CihazTipi = PosCihazTipi.HuginS1,
+            IdempotencyKey = idempotencyKey
+        }, Waiter);
+        Assert.Equal(tx.IslemId, idempotentTx.IslemId);
+
+        // Query status
+        var queried = repository.PosIslemSorgula(tx.IslemId);
+        Assert.Equal(tx.IslemId, queried.IslemId);
+
+        // Simulate terminal approval
+        var approved = repository.PosIslemSimuleSonuc(tx.IslemId, basarili: true);
+        Assert.Equal(PosDurum.Onaylandi, approved.Durum);
+        Assert.True(approved.Basarili);
+        Assert.NotNull(approved.AuthCode);
+        Assert.NotNull(approved.Rrn);
+        Assert.NotNull(approved.MaskedPan);
+
+        // Complete partial payment referencing this approved POS transaction
+        var paidReceipt = repository.Pay(12, new()
+        {
+            BaslikKayitNo = order.KayitNo,
+            BankaTutar = 150m,
+            KismiOdeme = true,
+            PosIslemId = tx.IslemId
+        }, Admin);
+
+        Assert.Equal(150m, paidReceipt.BankaToplam);
+        // Pos transaction is marked as recorded in ERP
+        var recordedPos = repository.PosIslemSorgula(tx.IslemId);
+        Assert.Equal(PosDurum.ErpKaydedildi, recordedPos.Durum);
+    }
+}

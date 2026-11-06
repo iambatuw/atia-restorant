@@ -1,0 +1,12 @@
+import {useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {Search,Plus,Utensils} from 'lucide-react';
+import {api,money} from './api';
+import type {Category,Product} from './types';
+import {Empty,ErrorBox,Loading} from './ui';
+export function MenuPage({onAdd,publicView=false,busy=false}:{onAdd?:(p:Product)=>void;publicView?:boolean;busy?:boolean}){
+ const menu=useQuery({queryKey:['menu'],queryFn:()=>api<Category[]>('/menu')});
+ const [category,setCategory]=useState<number|null>(null);const [search,setSearch]=useState('');
+ const products=(menu.data??[]).filter(c=>category===null||category===c.KayitNo).flatMap(c=>c.Urunler).filter(p=>p.Aktif&&p.StokAdi.toLocaleLowerCase('tr').includes(search.toLocaleLowerCase('tr')));
+ return <section className={`menu-page ${onAdd?'picker':''}`} aria-label="Ürün menüsü">{!onAdd&&!publicView&&<div className="page-heading"><div><h1>Menü</h1><p>Servisteki ürünler ve güncel fiyatları.</p></div><span className="pill">{menu.data?.reduce((n,c)=>n+c.Urunler.length,0)??'—'} ürün</span></div>}<div className="menu-controls"><div className="search"><Search size={18}/><input aria-label="Menüde ürün ara" placeholder="Ürün adıyla ara…" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="tabs" role="group" aria-label="Menü kategorileri"><button className={category===null?'selected':''} onClick={()=>setCategory(null)}>Tümü</button>{menu.data?.map(c=><button key={c.KayitNo} className={category===c.KayitNo?'selected':''} onClick={()=>setCategory(c.KayitNo)}>{c.GrupAdi}</button>)}</div></div><ErrorBox error={menu.error} retry={()=>void menu.refetch()}/>{menu.isPending?<Loading/>:products.length===0?<Empty>Ürün bulunamadı. Aramayı veya kategoriyi değiştirin.</Empty>:<div className="product-grid">{products.map(p=><article className="product" key={p.KayitNo}><div className="product-symbol"><Utensils size={23} strokeWidth={1.4}/></div><div className="product-content"><small>{p.GrupAdi}</small><h3>{p.StokAdi}</h3><div className="product-bottom"><strong>{money(p.SatisFiyati)}</strong>{onAdd&&<button disabled={busy} onClick={()=>onAdd(p)} aria-label={`${p.StokAdi} siparişe ekle`}><Plus size={20}/></button>}</div></div></article>)}</div>}{publicView&&<p className="menu-footnote">Fiyatlar Türk lirası cinsindendir. Alerjen bilgisi için lütfen servis ekibine danışın. Bu menüden doğrudan sipariş verilmez.</p>}</section>;
+}

@@ -1,0 +1,35 @@
+# Bağımlılıklar ve derleme çıktıları
+node_modules/
+dist/
+build/
+.tools/
+
+# .NET derleme ve geçici dosyaları
+**/bin/
+**/obj/
+**/TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# IDE ve Editör ayarları
+.vs/
+.vscode/
+.idea/
+
+# Ortam değişkenleri ve yerel yapılandırmalar
+.env
+.env.local
+.env.*.local
+appsettings.*.local.json
+
+# Test ve rapor çıktıları
+playwright-report/
+test-results/
+coverage/
+
+# İşletim sistemi kalıntıları
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store
