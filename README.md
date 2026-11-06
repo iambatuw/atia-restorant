@@ -1,5 +1,5 @@
 > ### 📌 Batuhan'dan Not
-> Test için böyle bir şey denedim, daha sonra hallederiz güncel bir şekilde.
+> Test için böyle bir şey denedim veritabanı vs zaten olmadığı için öylesine denemelik birşeyler yaptırdım 6.11.2026 // 22.08
 
 ---
 
