@@ -2,10 +2,11 @@
 
 ## Otomatik kontroller
 
-- Ön yüz: `npm test` — **7 geçti, 0 başarısız**. Kuruş hassasiyeti/ödeme girdileri, tarih biçimi, TL gösterimi, PascalCase API zarfı, bearer header ve hata aktarımı.
-- Ön yüz: `npm run build` — TypeScript ve Vite üretim derlemesi başarılı. SignalR bağımlılığında Rollup'ın kaldırdığı iki `/*#__PURE__*/` yorum uyarısı var; derleme hatası yok.
-- Çalışma zamanı npm bağımlılıkları: `npm audit --omit=dev` — **0 bilinen açık** (bu, kapsamlı güvenlik denetimi değildir).
-- API: .NET 10 Release derlemesi başarılı; xUnit — **14 geçti, 0 başarısız, 0 atlanan**. Repo/HTTP sözleşmesi, yetkiler, ödeme, fiyat otoritesi, eşzamanlı işlem, mutfak hazırlık durumu, SQL modunun kapalı olması ve İstanbul gün sınırı kontrolleri.
+- Mimari: **Tek Birleşik Proje Yapısı** — ASP.NET Core doğrudan `wwwroot` altındaki derlenmiş React SPA uygulamasını barındırır.
+- Ön yüz: `cd ClientApp && npm test` — **12 geçti, 0 başarısız**. Kuruş hassasiyeti, ödeme girdileri, POS durum makinesi, tarih biçimi, TL gösterimi, PascalCase API zarfı, bearer header ve hata aktarımı.
+- Ön yüz üretim derlemesi: `cd ClientApp && npm run build` — TypeScript ve Vite derlemesi başarılı; statik dosyalar doğrudan `wwwroot/` klasörüne aktarılmıştır.
+- API: .NET 10 xUnit — **19 geçti, 0 başarısız, 0 atlanan**. Repo/HTTP sözleşmesi, yetkiler, parçalı ödeme, POS entegrasyonu, masa ayırma/birleştirme/taşıma, fiyat otoritesi, eşzamanlı işlem, mutfak hazırlık durumu, SQL modunun fail-closed kapalı olması ve İstanbul gün sınırı kontrolleri.
+- Tek Port Canlı Çalışma: `dotnet run --urls http://127.0.0.1:5080` ile hem REST API (`/api/*`), hem SignalR Hub (`/hubs/*`), hem statik varlıklar (`/assets/*`), hem de React istemci rotaları (`/menu`, `/`, vb.) tek port ve tek süreç üzerinden başarıyla doğrulanmıştır.
 
 ## Gerçek tarayıcıda denenenler
 

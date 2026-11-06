@@ -4,13 +4,20 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AtiaRestorant.API</RootNamespace>
+    <SpaRoot>ClientApp\</SpaRoot>
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(SpaRoot)node_modules\**</DefaultItemExcludes>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
   </ItemGroup>
+
   <ItemGroup>
     <Compile Remove="Tests/**/*.cs" />
     <Content Remove="Tests/**" />
     <None Remove="Tests/**" />
+    <Compile Remove="ClientApp/**" />
+    <Content Remove="ClientApp/**" />
+    <None Remove="ClientApp/**" />
   </ItemGroup>
 </Project>

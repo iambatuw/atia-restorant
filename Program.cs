@@ -95,6 +95,8 @@ app.UseStatusCodePages(async statusContext =>
     { 401 => "Oturum açmanız gerekiyor.", 403 => "Bu işlem için yetkiniz yok.", 404 => "Kaynak bulunamadı.",
         400 => "İstek geçersiz.", _ => "İstek tamamlanamadı." }).ExecuteAsync(statusContext.HttpContext);
 });
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseRouting();
 if (app.Environment.IsDevelopment()) app.UseCors();
 app.Use(async (context, next) =>
@@ -174,6 +176,7 @@ api.MapDelete("/rezervasyonlar/{id:long}", (long id, ClaimsPrincipal user, Resta
     IHubContext<RestorantHub> hub, ILoggerFactory logs) => Mutate(() => repository.DeleteReservation(id, Actor(user)), hub, logs))
     .RequireAuthorization("Admin");
 app.MapHub<RestorantHub>("/hubs/restorant").RequireAuthorization("Staff");
+app.MapFallbackToFile("{*path:regex(^(?!api|hubs).*$)}", "index.html");
 app.Run();
 
 static StaffActor Actor(ClaimsPrincipal user)

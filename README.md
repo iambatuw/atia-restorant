@@ -49,30 +49,31 @@ Eski masaüstü kod tabanında tespit edilen ve işletme operasyonunu bozan kök
 
 ---
 
-## 🚀 Kurulum ve Çalıştırma
+## 🚀 Kurulum ve Tek Komutla Çalıştırma (Tek Proje Mimarisi)
+
+Sistem artık **tek bir birleşik ASP.NET Core projesi** olarak yapılandırılmıştır. Backend ve derlenmiş React Single Page Application (SPA) arayüzü aynı web sunucusunda (`wwwroot`) barındırılır. Tek bir komutla hem API hem de web arayüzü yayına alınır.
 
 ### Gereksinimler
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (veya üzeri)
-- [Node.js](https://nodejs.org/) (v20 veya v22+) ve npm
+- *(İsteğe bağlı - Sadece arayüz geliştirme için)* [Node.js](https://nodejs.org/) v20+
 
-### 1. Backend Servisini Başlatma (.NET 10 API)
-Proje kök dizininde bir terminal açın:
+### Tek Adımda Başlatma (Tavsiye Edilen)
+Proje kök dizininde tek bir komut çalıştırmanız yeterlidir:
 
 ```bash
-cd AtiaRestorant.API
-dotnet run --urls "http://127.0.0.1:5080"
+dotnet run --urls "http://127.0.0.1:5080" --environment Development
 ```
-*Backend servisi `http://127.0.0.1:5080` adresinde dinlemeye başlayacaktır.*
+*Uygulama `http://127.0.0.1:5080` adresinde açılır. Hem web arayüzü, hem `/api/...` uç noktaları hem de SignalR soket bağlantısı tek port üzerinden kesintisiz çalışır.*
 
-### 2. Frontend Uygulamasını Başlatma (React / Vite)
-İkinci bir terminal açın:
+### Arayüz Geliştirme Modu (Vite Hot-Reload)
+React bileşenlerinde anlık değişiklik yapmak istediğinizde:
 
 ```bash
-cd atia-restorant-web
+cd ClientApp
 npm install
 npm run dev
 ```
-*Web uygulaması `http://127.0.0.1:5173` adresinde açılacaktır.*
+*Vite geliştirme sunucusu `http://127.0.0.1:5173` adresinde açılır ve istekleri otomatik olarak 5080 portundaki backend servisine yönlendirir.*
 
 ---
 
@@ -86,23 +87,24 @@ Uygulama demo ve geliştirme modunda aşağıdaki hesaplarla test edilebilir:
 | **Garson** | `garson` | `demo123` |
 | **Mutfak** | `mutfak` | `demo123` |
 
-*Müşteri QR menüsüne erişmek için giriş ekranının altındaki **"Müşteri menüsünü aç"** bağlantısına tıklayabilir veya doğrudan `http://127.0.0.1:5173/menu` adresine gidebilirsiniz.*
+*Müşteri QR menüsüne erişmek için giriş ekranının altındaki **"Müşteri menüsünü aç"** bağlantısına tıklayabilir veya doğrudan `http://127.0.0.1:5080/menu` adresine gidebilirsiniz.*
 
 ---
 
 ## 🧪 Test ve Doğrulama
 
-Sistem hem backend hem de frontend tarafında kapsamlı birim ve entegrasyon testleriyle korunmaktadır:
+Sistem hem backend hem de frontend tarafında kapsamlı testlerle korunmaktadır:
 
 ```bash
 # Backend Testleri (19 Test - xUnit)
-dotnet test AtiaRestorant.API/Tests/AtiaRestorant.API.Tests.csproj
+dotnet test Tests/AtiaRestorant.API.Tests.csproj
 
 # Frontend Testleri (12 Test - Vitest)
-cd atia-restorant-web
+cd ClientApp
 npm test
 
-# Frontend Üretim Derlemesi (TypeScript & Vite Build)
+# Frontend Üretim Derlemesi (wwwroot çıktısı)
+cd ClientApp
 npm run build
 ```
 
