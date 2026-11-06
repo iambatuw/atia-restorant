@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/kitchen.tsx","./src/management.tsx","./src/menupage.tsx","./src/tables.tsx","./src/api.test.ts","./src/api.ts","./src/main.tsx","./src/types.ts","./src/ui.tsx"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/kitchen.tsx","./src/loginpage.tsx","./src/management.tsx","./src/menupage.tsx","./src/tables.tsx","./src/api.test.ts","./src/api.ts","./src/main.tsx","./src/types.ts","./src/ui.tsx"],"version":"5.9.3"}

@@ -93,49 +93,75 @@ export function Tables({session}:{session:Session}){
           <ErrorBox error={tables.error||sections.error} retry={()=>{void tables.refetch();void sections.refetch();}}/>
           {tables.isPending?<Loading/>:visible.length===0?<Empty>Bu filtreye uygun masa yok.</Empty>:(
             <div className="table-grid">
-              {visible.map(t=>(
-                <button
-                  className={`table-tile ${t.BaslikKayitNo?'occupied':t.Rezerve?'reserved':'free'} ${selected===t.MasaId?'picked':''}`}
-                  key={t.MasaId}
-                  onClick={()=>setSelected(t.MasaId)}
-                  aria-pressed={selected===t.MasaId}
-                >
-                  <div className="table-top">
-                    <span className="table-state"><i className="dot"/>{t.BaslikKayitNo?'Dolu':t.Rezerve?'Rezerve':'Boş'}</span>
-                    {t.BaslikKayitNo?<span className="elapsed"><Clock3 size={12}/>{minutes(t.AcilisTarihi)} dk</span>:null}
-                  </div>
-                  <div className="table-center">
-                    <Armchair size={28} strokeWidth={1.4}/>
-                    <h2>{t.MasaAdi}</h2>
-                    <span>{t.RestorantBolumAdi}</span>
-                  </div>
-                  <div className="table-bottom">
-                    {t.BaslikKayitNo?(
-                      <>
-                        <span><Users size={14}/>{t.KisiSayisi||'—'}</span>
-                        <strong>{money(t.Tutar)}</strong>
-                      </>
-                    ):(
-                      <>
-                        <span>{t.Rezerve?'Rezervasyon var':'Siparişe hazır'}</span>
-                        <Plus size={17}/>
-                      </>
-                    )}
-                  </div>
-                </button>
-              ))}
+              {visible.map(t=>{
+                const mins=minutes(t.AcilisTarihi);
+                const timerLevel=mins>=60?'late':mins>=30?'warm':'calm';
+                return (
+                  <button
+                    className={`table-card ${t.BaslikKayitNo?'occupied':t.Rezerve?'reserved':'free'} ${selected===t.MasaId?'picked':''}`}
+                    key={t.MasaId}
+                    onClick={()=>setSelected(t.MasaId)}
+                    aria-pressed={selected===t.MasaId}
+                  >
+                    <div className="table-card-top">
+                      <span className={`status-chip ${t.BaslikKayitNo?'occupied':t.Rezerve?'reserved':'free'}`}>
+                        <span className="chip-dot"/>
+                        {t.BaslikKayitNo?'Dolu':t.Rezerve?'Rezerve':'Boş'}
+                      </span>
+                      {t.BaslikKayitNo&&(
+                        <span className={`timer-chip ${timerLevel}`}>
+                          <Clock3 size={12}/>
+                          <span>{mins} dk</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="table-card-center">
+                      <div className="table-glyph">
+                        <Armchair size={26} strokeWidth={1.5}/>
+                      </div>
+                      <div className="table-name-block">
+                        <h2 className="table-title">{t.MasaAdi}</h2>
+                        <span className="table-section-tag">{t.RestorantBolumAdi}</span>
+                      </div>
+                    </div>
+                    <div className="table-card-bottom">
+                      {t.BaslikKayitNo?(
+                        <>
+                          <span className="guests-info">
+                            <Users size={13}/> {t.KisiSayisi||2} Kişi
+                          </span>
+                          <strong className="bill-amount">{money(t.Tutar)}</strong>
+                        </>
+                      ):(
+                        <>
+                          <span className="open-cue">{t.Rezerve?'Rezervasyon Var':'Adisyon Aç'}</span>
+                          <span className="plus-glyph"><Plus size={16}/></span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
-          <div className="floor-note"><i className="dot free"/> Masa seçerek adisyonu açın veya yeni sipariş ekleyin.</div>
+          <div className="floor-note">
+            <span className="floor-note-dot"/>
+            <span>Masa kartına tıklayarak adisyon detayını açabilir veya sipariş ekleyebilirsiniz.</span>
+          </div>
         </section>
         {table?(
           <TableOrder key={table.MasaId} table={table} admin={session.Rol==='Admin'} allTables={tables.data??[]} close={()=>setSelected(null)}/>
         ):(
           <aside className="order-placeholder">
-            <ReceiptText size={42} strokeWidth={1.2}/>
-            <h2>Servise hazırız.</h2>
-            <p>Adisyonu görmek için<br/>bir masa seçin.</p>
-            <span>Masalar anlık güncellenir</span>
+            <div className="placeholder-icon-wrap">
+              <ReceiptText size={38} strokeWidth={1.3}/>
+            </div>
+            <h2>Servis Masası Seçiniz</h2>
+            <p>Açık adisyon detaylarını, sipariş kalemlerini veya ödeme işlemlerini görüntülemek için sol taraftan bir masa seçin.</p>
+            <div className="placeholder-pulse">
+              <span className="pulse-indicator"/>
+              <span>SignalR Anlık Masa Senkronizasyonu</span>
+            </div>
           </aside>
         )}
       </div>
@@ -201,78 +227,164 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
   };
 
   return (
-    <aside className="order-panel">
+    <aside className="order-panel guest-check-panel">
       <div className="order-heading">
-        <div>
-          <span className="subtle">{table.RestorantBolumAdi}</span>
+        <div className="order-heading-title">
+          <span className="order-section-badge">{table.RestorantBolumAdi}</span>
           <h2>{table.MasaAdi}</h2>
         </div>
         <button className="icon-button" onClick={close} aria-label="Adisyon panelini kapat">
-          <X size={20}/>
+          <X size={18}/>
         </button>
       </div>
-      <div className="receipt-meta">
-        <span><ReceiptText size={15}/>{order?`Adisyon ${order.KayitNo}`:'Yeni adisyon'}</span>
-        <span><Clock3 size={15}/>{minutes(table.AcilisTarihi)} dk</span>
+
+      <div className="receipt-meta-bar">
+        <div className="meta-left">
+          <ReceiptText size={14}/>
+          <span>{order?`Adisyon #${order.KayitNo}`:'Yeni Masa Açık'}</span>
+        </div>
+        <div className="meta-right">
+          <Clock3 size={14}/>
+          <span>{minutes(table.AcilisTarihi)} dk açık</span>
+        </div>
       </div>
+
       <ErrorBox error={receipt.error||mutation.error} retry={()=>void receipt.refetch()}/>
-      <div className="order-lines">
-        {receipt.isPending?<Loading/>:!order||order.Detaylar.length===0?(
-          <Empty>Henüz sipariş yok.<br/>Menüden ürün ekleyerek başlayın.</Empty>
+
+      <div className="order-lines-container">
+        {receipt.isPending?(
+          <Loading/>
+        ):!order||order.Detaylar.length===0?(
+          <div className="empty-order-card">
+            <ReceiptText size={32} strokeWidth={1.3}/>
+            <p>Bu masada henüz sipariş bulunmuyor.<br/>Aşağıdaki butona dokunarak menüden ürün ekleyin.</p>
+          </div>
         ):(
-          order.Detaylar.map(line=>(
-            <div className="order-line" key={line.KayitNo}>
-              <div className="line-title">
-                <strong>{line.StokAdi}</strong>
-                <strong>{money(line.SatirTutari)}</strong>
-              </div>
-              {line.SatirAciklama?<small className="order-note">{line.SatirAciklama}</small>:null}
-              <div className="line-controls">
-                <span>{money(line.BirimFiyat)} / adet</span>
-                <div className="quantity">
-                  <button disabled={busy} aria-label={`${line.StokAdi} azalt`} onClick={()=>change(line,-1)}>
-                    <Minus size={14}/>
-                  </button>
-                  <span>{line.Miktar}</span>
-                  <button disabled={busy} aria-label={`${line.StokAdi} artır`} onClick={()=>change(line,1)}>
-                    <Plus size={14}/>
+          <div className="order-lines-list">
+            {order.Detaylar.map(line=>(
+              <div className="order-item-row" key={line.KayitNo}>
+                <div className="item-row-top">
+                  <div className="item-qty-badge">{line.Miktar}×</div>
+                  <strong className="item-name">{line.StokAdi}</strong>
+                  <strong className="item-sum">{money(line.SatirTutari)}</strong>
+                </div>
+
+                {line.SatirAciklama&&(
+                  <div className="item-note-tag">
+                    <span>Not: {line.SatirAciklama}</span>
+                  </div>
+                )}
+
+                <div className="item-row-bottom">
+                  <span className="unit-price">{money(line.BirimFiyat)} / adet</span>
+                  <div className="item-stepper">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={`${line.StokAdi} adet azalt`}
+                      onClick={()=>change(line,-1)}
+                    >
+                      <Minus size={13}/>
+                    </button>
+                    <span className="stepper-val">{line.Miktar}</span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={`${line.StokAdi} adet artır`}
+                      onClick={()=>change(line,1)}
+                    >
+                      <Plus size={13}/>
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="item-delete-btn"
+                    aria-label={`${line.StokAdi} satırını sil`}
+                    onClick={()=>setCancel(line)}
+                    title="Ürünü İptal Et / Sil"
+                  >
+                    <Trash2 size={14}/>
                   </button>
                 </div>
-                <button disabled={busy} className="delete-line" aria-label={`${line.StokAdi} sil`} onClick={()=>setCancel(line)}>
-                  <Trash2 size={15}/>
-                </button>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
-      <div className="order-actions">
-        <button className="secondary full" disabled={busy||receipt.isPending||!!receipt.error} onClick={()=>{mutation.reset();setPicker(true);}}>
-          <Plus size={18}/> Ürün ekle
+
+      <div className="order-slip-footer">
+        <button
+          type="button"
+          className="add-dish-btn"
+          disabled={busy||receipt.isPending||!!receipt.error}
+          onClick={()=>{mutation.reset();setPicker(true);}}
+        >
+          <Plus size={17}/> <span>Menüden Ürün Ekle</span>
         </button>
-        <div className="total">
-          <span>Hesap toplamı</span>
-          <strong>{money(order?.GenelToplam)}</strong>
-        </div>
+
+        {order&&(
+          <div className="receipt-calc-table">
+            <div className="calc-row">
+              <span>Ara Toplam</span>
+              <span>{money(order.GenelToplam/1.1)}</span>
+            </div>
+            <div className="calc-row">
+              <span>KDV (%10 Dahil)</span>
+              <span>{money(order.GenelToplam-order.GenelToplam/1.1)}</span>
+            </div>
+            <div className="calc-row grand-total">
+              <span className="grand-label">Ödenecek Tutar</span>
+              <strong className="grand-val">{money(order.GenelToplam)}</strong>
+            </div>
+          </div>
+        )}
+
         {admin?(
-          <>
-            <button className="primary full" disabled={!order||busy} onClick={()=>setPayment(true)}>
-              <ReceiptText size={18}/> Ödeme al <ArrowRight size={17}/>
+          <div className="pos-actions-block">
+            <button
+              type="button"
+              className="primary full pay-action-btn"
+              disabled={!order||order.Detaylar.length===0||busy}
+              onClick={()=>setPayment(true)}
+            >
+              <CreditCard size={18}/>
+              <span>Hesabı Kapat / Ödeme Al</span>
+              <ArrowRight size={17}/>
             </button>
-            <div className="table-actions-row">
-              <button className="secondary" disabled={!order||busy} onClick={()=>setTransfer(true)} title="Adisyonu boş masaya aktar">
-                <MoveRight size={14}/> Taşı
+
+            <div className="table-ops-grid">
+              <button
+                type="button"
+                className="secondary"
+                disabled={!order||busy}
+                onClick={()=>setTransfer(true)}
+                title="Adisyonu başka masaya taşı"
+              >
+                <MoveRight size={14}/> <span>Taşı</span>
               </button>
-              <button className="secondary" disabled={!order||order.Detaylar.length<=1||busy} onClick={()=>setSplit(true)} title="Sipariş satırlarını yeni masaya ayır">
-                <Split size={14}/> Ayır
+              <button
+                type="button"
+                className="secondary"
+                disabled={!order||order.Detaylar.length<=1||busy}
+                onClick={()=>setSplit(true)}
+                title="Siparişleri bölerek yeni masaya aktar"
+              >
+                <Split size={14}/> <span>Ayır</span>
               </button>
-              <button className="secondary" disabled={!order||busy} onClick={()=>setMerge(true)} title="Diğer açık masaları bu masaya birleştir">
-                <GitMerge size={14}/> Birleştir
+              <button
+                type="button"
+                className="secondary"
+                disabled={!order||busy}
+                onClick={()=>setMerge(true)}
+                title="Diğer açık masaları bu masaya topla"
+              >
+                <GitMerge size={14}/> <span>Birleştir</span>
               </button>
             </div>
-          </>
+          </div>
         ):(
-          <p className="permission-note">Ödeme ve masa transfer işlemlerini yönetici tamamlar.</p>
+          <p className="permission-note">Ödeme ve masa transfer yetkisi yönetici rolüne aittir.</p>
         )}
       </div>
 

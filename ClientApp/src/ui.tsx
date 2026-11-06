@@ -1,6 +1,6 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import type {ReactNode} from 'react';
-import {AlertCircle,LoaderCircle,Moon,Sun,Monitor,X} from 'lucide-react';
+import {AlertCircle,LoaderCircle,Moon,Sun,X} from 'lucide-react';
 
 export function ErrorBox({error,retry}:{error:unknown;retry?:()=>void}) {
  if(!error)return null;
@@ -70,39 +70,30 @@ export function Modal({title,children,onClose,preventClose=false}:{title:string;
  );
 }
 
-export type ThemeMode = 'system' | 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark';
 
 export function ThemeToggle(){
  const [mode,setMode]=useState<ThemeMode>(()=>{
   const saved=localStorage.getItem('restorant_theme') as ThemeMode|null;
-  return saved==='light'||saved==='dark'?saved:'system';
+  return saved==='dark'?'dark':'light';
  });
 
  useEffect(()=>{
   const root=document.documentElement;
-  const media=window.matchMedia('(prefers-color-scheme: dark)');
-
   const apply=()=>{
-   if(mode==='system'){
-    localStorage.removeItem('restorant_theme');
-    root.setAttribute('data-theme',media.matches?'dark':'light');
-   }else{
-    localStorage.setItem('restorant_theme',mode);
-    root.setAttribute('data-theme',mode);
-   }
+   localStorage.setItem('restorant_theme',mode);
+   root.setAttribute('data-theme',mode);
   };
 
   apply();
-  media.addEventListener('change',apply);
-  return ()=>media.removeEventListener('change',apply);
  },[mode]);
 
  const cycle=()=>{
-  setMode(prev=>prev==='system'?'light':prev==='light'?'dark':'system');
+  setMode(prev=>prev==='light'?'dark':'light');
  };
 
- const label=mode==='system'?'Sistem teması':mode==='light'?'Açık tema':'Koyu tema';
- const Icon=mode==='system'?Monitor:mode==='light'?Sun:Moon;
+ const label=mode==='light'?'Açık tema':'Koyu tema';
+ const Icon=mode==='light'?Sun:Moon;
 
  return (
   <button
