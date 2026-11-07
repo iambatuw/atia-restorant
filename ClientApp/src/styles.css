@@ -1556,6 +1556,8 @@ dialog::backdrop { background: rgba(26,20,16,.52); backdrop-filter: blur(2px); }
   box-shadow: var(--shadow-sm);
 }
 .customer-head .brand-wrapper { padding-left: 0; }
+.customer-head .brand-primary { color: var(--ink); }
+.customer-head .brand-secondary { color: var(--ink-soft); }
 .customer-head-actions { display: flex; align-items: center; gap: .5rem; }
 .customer-hero { padding: 3.5rem clamp(1.25rem, 6vw, 5rem) 2rem; }
 .customer-hero h1 { max-width: 700px; margin-bottom: .4rem; }
@@ -1585,6 +1587,7 @@ dialog::backdrop { background: rgba(26,20,16,.52); backdrop-filter: blur(2px); }
 
 @media (max-width: 1050px) {
   .app-shell { grid-template-columns: 68px minmax(0, 1fr); }
+  .mobile-logout { display: inline-flex; }
   .sidebar .brand-wrapper { justify-content: center; padding: 1.5rem .4rem; }
   .sidebar .brand-text-block,
   .sidebar-section-divider,

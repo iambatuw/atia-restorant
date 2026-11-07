@@ -94,11 +94,11 @@ export function LoginPage({health, healthError, retry, onLogin}: LoginPageProps)
             <p>
               {health == null
                 ? 'Sunucuya bağlanılıyor…'
-                : dbReady
-                  ? isDemo
-                    ? 'Demo ortamı aktif. Aşağıdan hızlı giriş yapabilirsiniz.'
-                    : 'Operasyon paneline erişmek için giriş yapın.'
-                  : 'Veritabanı bağlantısı bekleniyor.'}
+                : isDemo
+                  ? 'Demo ortamı aktif. Aşağıdan hızlı giriş yapabilirsiniz.'
+                  : dbReady
+                    ? 'Operasyon paneline erişmek için giriş yapın.'
+                    : 'Veritabanı bağlantısı bekleniyor.'}
             </p>
           </div>
 
