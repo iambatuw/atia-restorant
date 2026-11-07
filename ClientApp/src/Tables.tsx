@@ -57,7 +57,7 @@ export function Tables({session}:{session:Session}){
       <div className="page-heading">
         <div>
           <h1>Masa planı</h1>
-          <p>Salonun tamamı, bir bakışta.</p>
+          <p>Bir masa seçerek siparişleri görüntüleyin.</p>
         </div>
         <div className="date-label">
           {new Intl.DateTimeFormat('tr-TR',{weekday:'long',day:'numeric',month:'long'}).format(new Date())}
@@ -128,7 +128,7 @@ export function Tables({session}:{session:Session}){
                       {t.BaslikKayitNo?(
                         <>
                           <span className="guests-info">
-                            <Users size={13}/> {t.KisiSayisi||2} Kişi
+                            {t.KisiSayisi > 0 && <><Users size={13}/> {t.KisiSayisi} Kişi</>}
                           </span>
                           <strong className="bill-amount">{money(t.Tutar)}</strong>
                         </>
@@ -144,10 +144,6 @@ export function Tables({session}:{session:Session}){
               })}
             </div>
           )}
-          <div className="floor-note">
-            <span className="floor-note-dot"/>
-            <span>Masa kartına tıklayarak adisyon detayını açabilir veya sipariş ekleyebilirsiniz.</span>
-          </div>
         </section>
         {table?(
           <TableOrder key={table.MasaId} table={table} admin={session.Rol==='Admin'} allTables={tables.data??[]} close={()=>setSelected(null)}/>
@@ -156,12 +152,8 @@ export function Tables({session}:{session:Session}){
             <div className="placeholder-icon-wrap">
               <ReceiptText size={38} strokeWidth={1.3}/>
             </div>
-            <h2>Servis Masası Seçiniz</h2>
-            <p>Açık adisyon detaylarını, sipariş kalemlerini veya ödeme işlemlerini görüntülemek için sol taraftan bir masa seçin.</p>
-            <div className="placeholder-pulse">
-              <span className="pulse-indicator"/>
-              <span>SignalR Anlık Masa Senkronizasyonu</span>
-            </div>
+            <h2>Bir masa seçin</h2>
+            <p>Siparişler ve hesap burada görünür.</p>
           </aside>
         )}
       </div>
@@ -182,6 +174,7 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
   const [merge,setMerge]=useState(false);
   const [cancel,setCancel]=useState<OrderLine|null>(null);
   const [note,setNote]=useState('');
+  const [portionProduct,setPortionProduct]=useState<Product|null>(null);
 
   const receipt=useQuery({
     queryKey:['receipt',table.MasaId],
@@ -207,10 +200,11 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
   const busy=mutation.isPending||transferMutation.isPending;
   const order=receipt.data;
 
-  const add=(p:Product)=>{
+  const add=(p:Product,portionId?:number)=>{
+    if (p.Porsiyonlar?.length && portionId===undefined) { setPortionProduct(p); return; }
     mutation.mutate(
-      {path:'/siparisler',method:'POST',body:{MasaKayitNo:table.MasaId,StokKayitNo:p.KayitNo,Miktar:1,SatirAciklama:note}},
-      {onSuccess:()=>{setPicker(false);setNote('');}}
+      {path:'/siparisler',method:'POST',body:{MasaKayitNo:table.MasaId,StokKayitNo:p.KayitNo,PorsiyonKayitNo:portionId,Miktar:1,SatirAciklama:note}},
+      {onSuccess:()=>{setPicker(false);setPortionProduct(null);setNote('');}}
     );
   };
 
@@ -265,7 +259,7 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
               <div className="order-item-row" key={line.KayitNo}>
                 <div className="item-row-top">
                   <div className="item-qty-badge">{line.Miktar}×</div>
-                  <strong className="item-name">{line.StokAdi}</strong>
+                  <strong className="item-name">{line.StokAdi}{line.PorsiyonAdi?` · ${line.PorsiyonAdi}`:''}</strong>
                   <strong className="item-sum">{money(line.SatirTutari)}</strong>
                 </div>
 
@@ -276,12 +270,13 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
                 )}
 
                 <div className="item-row-bottom">
-                  <span className="unit-price">{money(line.BirimFiyat)} / adet</span>
+                  <span className="unit-price">{line.Ikram?'İkram':`${money(line.BirimFiyat)} / adet`}</span>
+                  {admin&&<button type="button" disabled={busy} onClick={()=>mutation.mutate({path:`/siparisler/${line.KayitNo}`,method:'PATCH',body:{DetayKayitNo:line.KayitNo,Miktar:line.Miktar,SatirAciklama:line.SatirAciklama,Ikram:!line.Ikram}})}>{line.Ikram?'İkramı kaldır':'İkram et'}</button>}
                   <div className="item-stepper">
                     <button
                       type="button"
                       disabled={busy}
-                      aria-label={`${line.StokAdi} adet azalt`}
+                      aria-label={`${line.StokAdi}${line.PorsiyonAdi?` ${line.PorsiyonAdi}`:''} adet azalt`}
                       onClick={()=>change(line,-1)}
                     >
                       <Minus size={13}/>
@@ -289,8 +284,8 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
                     <span className="stepper-val">{line.Miktar}</span>
                     <button
                       type="button"
-                      disabled={busy}
-                      aria-label={`${line.StokAdi} adet artır`}
+                      disabled={busy||(!admin&&line.Ikram)}
+                      aria-label={`${line.StokAdi}${line.PorsiyonAdi?` ${line.PorsiyonAdi}`:''} adet artır`}
                       onClick={()=>change(line,1)}
                     >
                       <Plus size={13}/>
@@ -300,7 +295,7 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
                     type="button"
                     disabled={busy}
                     className="item-delete-btn"
-                    aria-label={`${line.StokAdi} satırını sil`}
+                    aria-label={`${line.StokAdi}${line.PorsiyonAdi?` ${line.PorsiyonAdi}`:''} satırını sil`}
                     onClick={()=>setCancel(line)}
                     title="Ürünü İptal Et / Sil"
                   >
@@ -325,14 +320,6 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
 
         {order&&(
           <div className="receipt-calc-table">
-            <div className="calc-row">
-              <span>Ara Toplam</span>
-              <span>{money(order.GenelToplam/1.1)}</span>
-            </div>
-            <div className="calc-row">
-              <span>KDV (%10 Dahil)</span>
-              <span>{money(order.GenelToplam-order.GenelToplam/1.1)}</span>
-            </div>
             <div className="calc-row grand-total">
               <span className="grand-label">Ödenecek Tutar</span>
               <strong className="grand-val">{money(order.GenelToplam)}</strong>
@@ -389,10 +376,14 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
       </div>
 
       {picker&&(
-        <Modal title={`${table.MasaAdi} · Ürün ekle`} onClose={()=>{if(!busy)setPicker(false);}}>
+        <Modal title={`${table.MasaAdi} · Ürün ekle`} onClose={()=>{if(!busy){setPicker(false);setPortionProduct(null);}}}>
           <label>Sipariş notu <input maxLength={250} value={note} onChange={e=>setNote(e.target.value)} placeholder="Örn. soğansız, az pişmiş"/></label>
           <ErrorBox error={mutation.error}/>
-          <MenuPage onAdd={add} busy={busy}/>
+          {portionProduct ? <div>
+            <p><strong>{portionProduct.StokAdi}</strong> için porsiyon seçin.</p>
+            <div className="transfer-list">{portionProduct.Porsiyonlar.map(portion=><button key={portion.KayitNo} disabled={busy} onClick={()=>add(portionProduct,portion.KayitNo)}>{portion.PorsiyonAdi} <span>{money(portion.Fiyat)}</span></button>)}</div>
+            <button type="button" disabled={busy} onClick={()=>setPortionProduct(null)}>Ürünlere dön</button>
+          </div> : <MenuPage onAdd={add} busy={busy}/>}
           {busy&&<p role="status">Sipariş ekleniyor…</p>}
         </Modal>
       )}
@@ -535,8 +526,8 @@ function SplitModal({receipt,table,allTables,onClose}:{receipt:Receipt;table:Tab
                       id={`split-check-${line.KayitNo}`}
                     />
                     <label htmlFor={`split-check-${line.KayitNo}`} className="split-item-title">
-                      <strong>{line.StokAdi}</strong>
-                      <small>{line.Miktar} adet mevcut · {money(line.BirimFiyat)}</small>
+                      <strong>{line.StokAdi}{line.PorsiyonAdi?` · ${line.PorsiyonAdi}`:''}</strong>
+                      <small>{line.Miktar} adet mevcut · {line.Ikram?'İkram':money(line.BirimFiyat)}</small>
                     </label>
                   </div>
                   {isSelected&&(

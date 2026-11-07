@@ -39,6 +39,21 @@ public sealed class HttpContractTests
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result.Data.Token);
     }
 
+    [Theory]
+    [InlineData("admin", "Admin")]
+    [InlineData("garson", "Garson")]
+    [InlineData("mutfak", "Mutfak")]
+    public async Task SessionIdentityRequiresAuthenticationAndReturnsVerifiedRole(string username, string role)
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/session")).StatusCode);
+        await Login(client, username);
+        var result = await client.GetFromJsonAsync<JsonElement>("/api/auth/session");
+        Assert.Equal(role, result.GetProperty("Data").GetProperty("Rol").GetString());
+        Assert.True(result.GetProperty("Data").GetProperty("KullaniciId").GetInt32() > 0);
+    }
+
     [Fact]
     public async Task HealthMenuPascalCaseAndAuthenticatedRolesMatchContract()
     {

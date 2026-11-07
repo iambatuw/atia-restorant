@@ -46,6 +46,23 @@ public sealed class RepositoryTests
     }
 
     [Fact]
+    public void ComplimentaryQuantityRequiresAdminAndPaidReceiptsCannotFallBelowPayments()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(), Waiter);
+        var line = Assert.Single(receipt.Detaylar);
+        repository.UpdateOrder(line.KayitNo, new() { Miktar = 1, Ikram = true }, Admin);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.UpdateOrder(line.KayitNo, new() { Miktar = 2, Ikram = true }, Waiter)).Status);
+        repository.UpdateOrder(line.KayitNo, new() { Miktar = 1, Ikram = false }, Admin);
+        repository.Pay(12, new() { BaslikKayitNo = receipt.KayitNo, NakitTutar = 100, KismiOdeme = true }, Admin);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.UpdateOrder(line.KayitNo, new() { Miktar = 1, Ikram = true }, Admin)).Status);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.DeleteOrder(line.KayitNo, Admin)).Status);
+        Assert.Equal(320m, repository.Receipt(12)!.GenelToplam);
+        repository.Pay(12, new() { BaslikKayitNo = receipt.KayitNo, NakitTutar = 220 }, Admin);
+        Assert.Null(repository.Receipt(12));
+    }
+
+    [Fact]
     public async Task PaymentRejectsMismatchNegativeStaleAndConcurrentDuplicates()
     {
         var repository = Repository();

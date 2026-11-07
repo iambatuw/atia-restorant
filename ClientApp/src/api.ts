@@ -4,9 +4,10 @@ export function setToken(value:string) {token=value;}
 export class ApiError extends Error { constructor(message:string, public status:number) {super(message);} }
 export async function api<T>(path:string, options:RequestInit = {}):Promise<T> {
   let response:Response;
-  try {response=await fetch(`/api${path}`,{...options,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`} : {}),...options.headers}});} catch {throw new ApiError('Sunucuya ulaşılamıyor. API bağlantısını kontrol edip yeniden deneyin.',0);}
+  const requestToken=token;
+  try {response=await fetch(`/api${path}`,{...options,headers:{'Content-Type':'application/json',...(requestToken?{Authorization:`Bearer ${requestToken}`} : {}),...options.headers}});} catch {throw new ApiError('Sunucuya ulaşılamıyor. API bağlantısını kontrol edip yeniden deneyin.',0);}
   const data=await response.json().catch(()=>null);
-  if(!response.ok){if(response.status===401) window.dispatchEvent(new Event('auth-expired')); throw new ApiError(data?.detail ?? data?.Detail ?? data?.Message ?? data?.title ?? 'İşlem tamamlanamadı.',response.status);}
+  if(!response.ok){if(response.status===401 && requestToken && requestToken===token) window.dispatchEvent(new Event('auth-expired')); throw new ApiError(data?.detail ?? data?.Detail ?? data?.Message ?? data?.title ?? 'İşlem tamamlanamadı.',response.status);}
   if(!data?.Success) throw new ApiError(data?.Message ?? 'Sunucu yanıtı geçersiz.',response.status);
   return data.Data as T;
 }

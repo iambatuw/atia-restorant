@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
-import {Search,Plus,Utensils,Check,X} from 'lucide-react';
+import {Search,Plus,Utensils,X} from 'lucide-react';
 import {api,money} from './api';
 import type {Category,Product} from './types';
 import {Empty,ErrorBox,Loading} from './ui';
@@ -21,7 +21,6 @@ export function MenuPage({
 
   const [category,setCategory]=useState<number|null>(null);
   const [search,setSearch]=useState('');
-  const [addedItem,setAddedItem]=useState<number|null>(null);
 
   const categories=menu.data??[];
   const totalProducts=categories.reduce((acc,c)=>acc+c.Urunler.length,0);
@@ -34,8 +33,6 @@ export function MenuPage({
   const handleAdd=(p:Product)=>{
     if(!onAdd||busy) return;
     onAdd(p);
-    setAddedItem(p.KayitNo);
-    setTimeout(()=>setAddedItem(null),1200);
   };
 
   return (
@@ -117,8 +114,6 @@ export function MenuPage({
       ):(
         <div className="dish-grid">
           {products.map(p=>{
-            const isJustAdded=addedItem===p.KayitNo;
-
             return (
               <article className="dish-card" key={p.KayitNo}>
                 <div className="dish-card-header">
@@ -139,19 +134,11 @@ export function MenuPage({
                     <button
                       type="button"
                       disabled={busy}
-                      className={`dish-add-btn ${isJustAdded?'added':''}`}
+                      className="dish-add-btn"
                       onClick={()=>handleAdd(p)}
                       aria-label={`${p.StokAdi} adisyona ekle`}
                     >
-                      {isJustAdded?(
-                        <>
-                          <Check size={16}/> Eklendi
-                        </>
-                      ):(
-                        <>
-                          <Plus size={16}/> Ekle
-                        </>
-                      )}
+                      <Plus size={16}/> Ekle
                     </button>
                   )}
                 </div>

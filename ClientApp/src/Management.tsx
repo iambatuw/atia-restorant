@@ -37,10 +37,6 @@ function Reports(){
     <section className="mgmt-section" aria-label="Günlük Satış ve Operasyon Raporu">
       <div className="page-heading">
         <div>
-          <div className="mgmt-kicker">
-            <TrendingUp size={14}/>
-            <span>FİNANSAL DENETİM & KASA RAPORU</span>
-          </div>
           <h1>Günlük Rapor</h1>
           <p>Kapanan adisyonlar, tahsilat dağılımı ve saatlik ciro istatistikleri.</p>
         </div>

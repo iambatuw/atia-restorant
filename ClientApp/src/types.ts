@@ -3,9 +3,10 @@ export interface Session { Token:string; KullaniciAdi:string; Rol:Role; Kullanic
 export interface Health {Mode:string;DatabaseReady:boolean}
 export interface Table {MasaId:number;MasaAdi:string;MasaKodu:string;RestorantBolumuKayitNo:number;RestorantBolumAdi:string;BaslikKayitNo:number|null;Tutar:number|null;KisiSayisi:number;AcilisTarihi:string|null;Rezerve:boolean;BirlesmisMasa:boolean;AnaMasa:boolean;Durumu:number}
 export interface Section {KayitNo:number;BolumAdi:string;ToplamMasa:number;DoluMasa:number}
-export interface Product {KayitNo:number;StokAdi:string;SatisFiyati:number;GrupKayitNo:number;GrupAdi:string;Aktif:boolean;Porsiyonlar:unknown[]}
+export interface Portion {KayitNo:number;PorsiyonAdi:string;Fiyat:number}
+export interface Product {KayitNo:number;StokAdi:string;SatisFiyati:number;GrupKayitNo:number;GrupAdi:string;Aktif:boolean;Porsiyonlar:Portion[]}
 export interface Category {KayitNo:number;GrupAdi:string;Urunler:Product[]}
-export interface OrderLine {KayitNo:number;StokAdi:string;Miktar:number;BirimFiyat:number;SatirTutari:number;SatirAciklama:string|null;Ikram:boolean}
+export interface OrderLine {KayitNo:number;StokAdi:string;PorsiyonAdi:string|null;Miktar:number;BirimFiyat:number;SatirTutari:number;SatirAciklama:string|null;Ikram:boolean}
 export interface Receipt {
   KayitNo:number;
   MasaKayitNo:number;

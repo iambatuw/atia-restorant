@@ -1,4 +1,17 @@
 /* Login is intentionally isolated from the operational workspace styles. */
+:root:not([data-theme="dark"]) .entry-page {
+  --canvas: #e8e5de;
+  --paper: #f1eee8;
+  --paper-muted: #e3ded5;
+  --ink: #29231e;
+  --ink-soft: #62574d;
+  --line: #d2cbc0;
+  --line-strong: #afa397;
+  --accent: #88472c;
+  --accent-hover: #733a24;
+  --accent-soft: #e8d6c8;
+  --accent-ink: #71391f;
+}
 .entry-page {
   min-height: 100svh;
   background: var(--canvas);
@@ -50,6 +63,17 @@
   box-shadow: 0 2px 3px rgba(45,34,25,.025), 0 18px 36px -24px rgba(45,34,25,.18);
   transform: rotate(-2deg);
 }
+:root:not([data-theme="dark"]) .entry-plan {
+  --paper: #e2d6c8;
+  --paper-muted: #cbb9a7;
+  --canvas: #f1e7d9;
+  --line: #bca996;
+  --line-strong: #907763;
+  --ink-soft: #55463a;
+  --accent-soft: #c78c6a;
+  --accent: #81482f;
+  --accent-ink: #482819;
+}
 .entry-plan-heading { display: flex; justify-content: space-between; gap: 1rem; text-align: left; align-items: baseline; }
 .entry-plan-heading span:first-child { font-size: .85rem; font-weight: 700; }
 .entry-plan-heading span:last-child { font-size: .7rem; color: var(--ink-soft); white-space: nowrap; }
@@ -79,7 +103,6 @@
 }
 .entry-form-wrap { width: 100%; max-width: 350px; margin-block: auto; padding-block: 2rem; }
 .entry-form-heading { margin-bottom: 2rem; }
-.entry-lock { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 15px; margin-bottom: 1.8rem; color: var(--ink-soft); }
 .entry-form-heading h2 { font-size: clamp(1.9rem, 2.6vw, 2.5rem); letter-spacing: -.055em; font-weight: 800; margin-bottom: .8rem; }
 .entry-form-heading p { color: var(--ink-soft); line-height: 1.8; font-size: .9rem; margin-bottom: 0; }
 .entry-form { display: grid; gap: 1.25rem; }
@@ -121,7 +144,6 @@
   .entry-plan, .entry-story-footer { display: none; }
   .entry-access { padding: 2rem; border-radius: 20px; }
   .entry-form-wrap { max-width: 380px; padding: 0; }
-  .entry-lock { display: none; }
   .entry-form-heading { margin-bottom: 1.6rem; }
   .entry-form-heading h2 { font-size: 1.8rem; }
   .entry-form-heading p { font-size: .85rem; }

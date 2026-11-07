@@ -121,6 +121,11 @@ var api = app.MapGroup("/api").RequireAuthorization("Staff");
 api.MapGet("/health", () => Results.Ok(ApiResult.Ok(new { Mode = mode.Name, DatabaseReady = false }))).AllowAnonymous();
 api.MapPost("/auth/login", (LoginRequest request, AuthService auth) => Results.Ok(ApiResult<LoginResponse>.Ok(auth.Login(request))))
     .AllowAnonymous().RequireRateLimiting("login");
+api.MapGet("/auth/session", (ClaimsPrincipal user) => Results.Ok(ApiResult.Ok(new {
+    KullaniciId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!),
+    TamAd = user.FindFirstValue(ClaimTypes.Name)!,
+    Rol = user.FindFirstValue(ClaimTypes.Role)!
+})));
 api.MapGet("/menu", (RestaurantRepository repository) => Results.Ok(ApiResult<List<MenuKategoriDTO>>.Ok(repository.Menu()))).AllowAnonymous();
 api.MapGet("/bolumler", (RestaurantRepository repository) => Results.Ok(ApiResult<List<RestorantBolumDTO>>.Ok(repository.Sections())));
 api.MapGet("/masalar", (long? bolumId, RestaurantRepository repository) =>

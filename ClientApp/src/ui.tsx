@@ -73,19 +73,17 @@ export function Modal({title,children,onClose,preventClose=false}:{title:string;
 export type ThemeMode = 'light' | 'dark';
 
 export function ThemeToggle(){
- const [mode,setMode]=useState<ThemeMode>(()=>{
-  const saved=localStorage.getItem('restorant_theme') as ThemeMode|null;
-  return saved==='dark'?'dark':'light';
- });
+ const [mode,setMode]=useState<ThemeMode>(()=>
+  document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light'
+ );
 
  useEffect(()=>{
-  const root=document.documentElement;
-  const apply=()=>{
+  document.documentElement.setAttribute('data-theme',mode);
+  try {
    localStorage.setItem('restorant_theme',mode);
-   root.setAttribute('data-theme',mode);
-  };
-
-  apply();
+  } catch {
+   // The theme remains available for this page even when storage is blocked.
+  }
  },[mode]);
 
  const cycle=()=>{

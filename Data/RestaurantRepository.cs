@@ -159,7 +159,10 @@ public sealed class RestaurantRepository
         Require(request.DetayKayitNo == 0 || request.DetayKayitNo == id, "URL ve sipariş kimliği uyuşmuyor.");
         Quantity(request.Miktar); Note(request.SatirAciklama);
         var (receipt, line) = Line(id);
-        Require(actor.IsAdmin || request.Ikram == line.Ikram, "İkram yalnızca yönetici tarafından değiştirilebilir.", 403);
+        Require(actor.IsAdmin || (request.Ikram == line.Ikram && (!line.Ikram || request.Miktar <= line.Miktar)), "İkram yalnızca yönetici tarafından artırılabilir veya değiştirilebilir.", 403);
+        var paid = (receipt.NakitToplam ?? 0) + (receipt.BankaToplam ?? 0) + (receipt.CariToplam ?? 0) + (receipt.YemekKartiToplam ?? 0) + (receipt.IndirimToplam ?? 0);
+        var newLineTotal = request.Ikram ? 0 : decimal.Round(request.Miktar * line.BirimFiyat, 2, MidpointRounding.AwayFromZero);
+        Require(receipt.GenelToplam - line.SatirTutari + newLineTotal >= paid, "Sipariş toplamı alınmış ödemeden düşük olamaz.", 409);
         // Clamp on reduction so decreasing then increasing never resurrects readiness.
         _ready[id] = Math.Min(_ready.GetValueOrDefault(id), request.Miktar);
         line.Miktar = request.Miktar;
@@ -173,6 +176,8 @@ public sealed class RestaurantRepository
     {
         Staff(actor, "Garson", "Admin");
         var (receipt, line) = Line(id);
+        var paid = (receipt.NakitToplam ?? 0) + (receipt.BankaToplam ?? 0) + (receipt.CariToplam ?? 0) + (receipt.YemekKartiToplam ?? 0) + (receipt.IndirimToplam ?? 0);
+        Require(receipt.GenelToplam - line.SatirTutari >= paid, "Sipariş toplamı alınmış ödemeden düşük olamaz.", 409);
         receipt.Detaylar.Remove(line); _ready.Remove(id);
         Recalculate(receipt);
         // Keep even an empty receipt open until an administrator explicitly closes it.
@@ -256,6 +261,7 @@ public sealed class RestaurantRepository
             "Birleşmiş masalarda ayırma işlemi yapılamaz.", 409);
 
         var sourceReceipt = Open(sourceTable.MasaId) ?? throw new ApiException(409, "Kaynak masada açık adisyon yok.");
+        Require((sourceReceipt.NakitToplam ?? 0) + (sourceReceipt.BankaToplam ?? 0) + (sourceReceipt.CariToplam ?? 0) + (sourceReceipt.YemekKartiToplam ?? 0) + (sourceReceipt.IndirimToplam ?? 0) == 0, "Kısmi ödeme alınmış adisyon ayrılamaz.", 409);
         Require(Open(targetTable.MasaId) is null && !Reserved(targetTable.MasaId),
             "Hedef masa boş ve rezervasyonsuz olmalı.", 409);
         Require(request.AyrilanSatirlar is { Count: > 0 }, "Ayrılacak en az bir sipariş satırı seçilmelidir.");

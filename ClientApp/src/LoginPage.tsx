@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import type {FormEvent} from 'react';
-import {Eye, EyeOff, LockKeyhole} from 'lucide-react';
+import {Eye, EyeOff} from 'lucide-react';
 import type {Health, Session} from './types';
 import {login} from './api';
 import {ErrorBox, ThemeToggle} from './ui';
@@ -103,7 +103,6 @@ export function LoginPage({health, healthError, retry, onLogin}: LoginPageProps)
         <section className="entry-access" aria-labelledby="entry-access-title">
           <div className="entry-form-wrap">
             <div className="entry-form-heading">
-              <span className="entry-lock" aria-hidden="true"><LockKeyhole size={22} strokeWidth={1.6}/></span>
               <h2 id="entry-access-title">Hoş geldiniz.</h2>
               <p>İş gününüze buradan devam edin.<br/>Personel hesabınızla giriş yapın.</p>
             </div>

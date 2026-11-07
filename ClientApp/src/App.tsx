@@ -1,4 +1,4 @@
-import {lazy,Suspense,useCallback,useEffect,useState} from 'react';
+import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {HubConnectionBuilder,LogLevel} from '@microsoft/signalr';
 import {
@@ -6,15 +6,14 @@ import {
   ChefHat,
   BookOpen,
   ChartNoAxesCombined,
-  CalendarDays,
   LogOut,
   RefreshCw,
   ArrowUpRight,
-  UtensilsCrossed,
   Clock
 } from 'lucide-react';
 import type {Health,Session} from './types';
-import {api,setToken} from './api';
+import {api,ApiError,setToken} from './api';
+import {clearSessionToken,readSessionToken,saveSessionToken} from './session';
 import {Empty,Loading,ThemeToggle} from './ui';
 import {LoginPage} from './LoginPage';
 import {Tables} from './Tables';
@@ -27,6 +26,11 @@ type Page='masalar'|'mutfak'|'menu'|'raporlar'|'rezervasyonlar';
 export default function App(){
   const publicMenu=location.pathname==='/menu';
   const [session,setSession]=useState<Session|null>(null);
+  const [candidate] = useState(()=>publicMenu ? null : readSessionToken());
+  const [restoring,setRestoring]=useState(!!candidate);
+  const [restoreError,setRestoreError]=useState(false);
+  const [retryRestore,setRetryRestore]=useState(0);
+  const generation=useRef(0);
   const [page,setPage]=useState<Page>('masalar');
   const [currentTime,setCurrentTime]=useState(getFormattedTime());
   const client=useQueryClient();
@@ -37,8 +41,12 @@ export default function App(){
   },[]);
 
   const logout=useCallback(()=>{
+    generation.current++;
     setToken('');
+    clearSessionToken();
     setSession(null);
+    setRestoring(false);
+    setRestoreError(false);
     client.clear();
   },[client]);
 
@@ -46,6 +54,26 @@ export default function App(){
     window.addEventListener('auth-expired',logout);
     return()=>window.removeEventListener('auth-expired',logout);
   },[logout]);
+
+  useEffect(()=>{
+    if (!candidate || !restoring) return;
+    let cancelled=false;
+    const current=++generation.current;
+    setToken(candidate);
+    setRestoreError(false);
+    api<Pick<Session,'KullaniciId'|'TamAd'|'Rol'>>('/auth/session').then(identity=>{
+      if (cancelled || generation.current!==current) return;
+      if (!identity || !['Admin','Garson','Mutfak'].includes(identity.Rol) || !identity.TamAd || !identity.KullaniciId) throw new Error('Oturum bilgisi geçersiz.');
+      setSession({...identity,Token:candidate,KullaniciAdi:''});
+      setPage(identity.Rol==='Mutfak'?'mutfak':'masalar');
+      setRestoring(false);
+    }).catch(error=>{
+      if (cancelled || generation.current!==current) return;
+      if (error instanceof ApiError && (error.status===401 || error.status===403)) logout();
+      else setRestoreError(true);
+    });
+    return ()=>{cancelled=true;};
+  },[candidate,retryRestore,restoring,logout]);
 
   const health=useQuery({
     queryKey:['health'],
@@ -77,6 +105,10 @@ export default function App(){
     );
   }
 
+  if (restoring) {
+    return restoreError ? <div className="empty" role="alert"><p>Oturum doğrulanamadı. Bağlantınızı kontrol edin.</p><button className="primary" onClick={()=>setRetryRestore(n=>n+1)}>Yeniden dene</button><button className="secondary" onClick={logout}>Çıkış yap</button></div> : <Loading/>;
+  }
+
   if(!session) {
     return (
       <LoginPage
@@ -84,6 +116,8 @@ export default function App(){
         healthError={health.error}
         retry={()=>void health.refetch()}
         onLogin={s=>{
+          generation.current++;
+          saveSessionToken(s.Token);
           setToken(s.Token);
           setSession(s);
           setPage(s.Rol==='Mutfak'?'mutfak':'masalar');
@@ -94,11 +128,10 @@ export default function App(){
   }
 
   const nav=[
-    {id:'masalar',label:'Masa Planı',icon:Armchair,allowed:session.Rol!=='Mutfak'},
-    {id:'mutfak',label:'Mutfak (KDS)',icon:ChefHat,allowed:session.Rol!=='Garson'},
-    {id:'menu',label:'Menü Kataloğu',icon:BookOpen,allowed:true},
-    {id:'raporlar',label:'Günlük Rapor',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
-    {id:'rezervasyonlar',label:'Rezervasyonlar',icon:CalendarDays,allowed:session.Rol==='Admin'}
+    {id:'masalar',label:'Masalar',icon:Armchair,allowed:session.Rol!=='Mutfak'},
+    {id:'mutfak',label:'Mutfak',icon:ChefHat,allowed:session.Rol!=='Garson'},
+    {id:'menu',label:'Menü',icon:BookOpen,allowed:true},
+    {id:'raporlar',label:'Günlük rapor',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'}
   ];
   const current=nav.find(n=>n.id===page)!;
 
@@ -106,10 +139,6 @@ export default function App(){
     <div className="app-shell">
       <aside className="sidebar">
         <Brand/>
-        <div className="sidebar-section-divider">
-          <span>OPERASYON MENÜSÜ</span>
-        </div>
-
         <nav aria-label="Ana menü" className="sidebar-nav">
           {nav.filter(n=>n.allowed).map(n=>(
             <button
@@ -131,7 +160,7 @@ export default function App(){
           </div>
           <div className="callout-text">
             <strong>Müşteri Menüsü</strong>
-            <small>QR Katalog Önizleme</small>
+            <small>Menüyü görüntüle</small>
           </div>
           <ArrowUpRight size={15} className="callout-arrow"/>
         </a>
@@ -209,16 +238,6 @@ export default function App(){
           </Suspense>
         </main>
 
-        <footer className="app-footer">
-          <div className="footer-left">
-            <span className="brand-sub">ATİA POS RESTORAN SİSTEMİ</span>
-            <span className="footer-dot">•</span>
-            <span>.NET 10 LTS &amp; React 19</span>
-          </div>
-          <div className="footer-right">
-            <span>Server-Authoritative Financial Engine</span>
-          </div>
-        </footer>
       </div>
     </div>
   );
@@ -227,13 +246,9 @@ export default function App(){
 function Brand({isPublic=false}:{isPublic?:boolean}){
   return (
     <div className={`brand-wrapper ${isPublic?'public':''}`}>
-      <div className="brand-crest" aria-hidden="true">
-        <span className="crest-monogram">A</span>
-        <UtensilsCrossed size={12} className="crest-sub-icon"/>
-      </div>
       <div className="brand-text-block">
-        <span className="brand-primary">ATİA</span>
-        <span className="brand-secondary">{isPublic?'BİSTRO &amp; GOURMET':'RESTORAN &amp; POS'}</span>
+        <span className="brand-primary">ATIA</span>
+        <span className="brand-secondary">Restorant</span>
       </div>
     </div>
   );
@@ -287,7 +302,7 @@ function Realtime({token}:{token:string}){
   return (
     <span
       className={`connection-pill ${connected?'live':'offline'}`}
-      title={connected?'Canlı SignalR bağlantısı aktif':'Bağlantı kuruluyor; veriler 15 saniyede yenilenir'}
+      title={connected?'Canlı bağlantı açık':'Bağlantı yeniden kurulmaya çalışılıyor'}
     >
       <span className="live-dot" aria-hidden="true"/>
       <span>{connected?'Canlı':'Bağlanıyor'}</span>
