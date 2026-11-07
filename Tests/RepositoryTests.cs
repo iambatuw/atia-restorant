@@ -24,18 +24,18 @@ public sealed class RepositoryTests
         Assert.Equal(403, Assert.Throws<ApiException>(() => repository.UpdateOrder(line.KayitNo,
             new() { Miktar = 1, Ikram = true }, Waiter)).Status);
         Assert.DoesNotContain(repository.Audit(date, Admin), entry => entry.Islem == "İkram verildi");
-        repository.DeleteOrder(line.KayitNo, Waiter);
+        repository.RemoveOrder(line.KayitNo, new() { Tip = SiparisCikarmaTipi.Iptal, Gerekce = "Müşteri vazgeçti" }, Waiter);
         var replacement = repository.AddOrder(Order(), Waiter);
         repository.Pay(12, new() { BaslikKayitNo = replacement.KayitNo, NakitTutar = 100, KismiOdeme = true }, Admin);
         repository.Pay(12, new() { BaslikKayitNo = replacement.KayitNo, BankaTutar = 220 }, Admin);
         var history = repository.Audit(date, Admin);
-        Assert.Contains(history, entry => entry.Islem == "Ürün silindi" && entry.PersonelId == Waiter.Id && entry.Tutar == 320m);
+        Assert.Contains(history, entry => entry.Islem == "Ürün iptal edildi" && entry.PersonelId == Waiter.Id && entry.Tutar == 320m);
         Assert.Equal(2, history.Count(entry => entry.Islem == "Ödeme alındı" &&
             entry.PersonelId == Admin.Id && entry.AdisyonNo == replacement.KayitNo));
         var total = repository.DailyReport(date, Admin).Mutabakat;
         Assert.Equal(100m, total.Nakit);
         Assert.Equal(700m, total.Banka); // Seeded closed adisyon: 480 TL.
-        Assert.Equal(320m, total.SilinenUrunTutari);
+        Assert.Equal(320m, total.IptalTutari);
         Assert.Equal(3, total.OdemeSayisi);
         Assert.Equal(800m, total.Tahsilat);
         Assert.Equal(0m, total.Fark);
@@ -51,6 +51,41 @@ public sealed class RepositoryTests
         Assert.Equal(before.ToplamCiro, after.ToplamCiro);
         Assert.Equal(before.ToplamAdisyon, after.ToplamAdisyon);
         Assert.Contains(repository.Audit(repository.BusinessToday, Admin), entry => entry.Islem == "Masalar birleştirildi");
+    }
+
+    [Fact]
+    public void FailedMergeLeavesBothReceiptsAndAuditUntouched()
+    {
+        var repository = Repository();
+        var before = repository.Receipt(1)!;
+        var auditCount = repository.Audit(repository.BusinessToday, Admin).Count;
+        Assert.Equal(404, Assert.Throws<ApiException>(() => repository.Merge(new()
+        { AnaMasaKayitNo = 1, BirlestirilecekMasaKayitNolar = [3, 999] }, Admin)).Status);
+        Assert.Equal(before.GenelToplam, repository.Receipt(1)!.GenelToplam);
+        Assert.NotNull(repository.Receipt(3));
+        Assert.Equal(auditCount, repository.Audit(repository.BusinessToday, Admin).Count);
+    }
+
+    [Fact]
+    public void CancellationWasteAndKitchenReadinessAreSeparateAuthorizedOperations()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(), Waiter);
+        var line = Assert.Single(receipt.Detaylar);
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.RemoveOrder(line.KayitNo,
+            new() { Gerekce = " " }, Waiter)).Status);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.RemoveOrder(line.KayitNo,
+            new() { Tip = SiparisCikarmaTipi.Zayi, Gerekce = "Döküldü" }, Waiter)).Status);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.MarkLineReady(line.KayitNo, Waiter)).Status);
+        repository.MarkLineReady(line.KayitNo, Cook);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.MarkLineReady(line.KayitNo, Cook)).Status);
+        var eventItem = repository.KitchenEvents(Cook).Single(e => e.AdisyonNo == receipt.KayitNo);
+        repository.AcknowledgeKitchenEvent(eventItem.KayitNo, Cook);
+        Assert.DoesNotContain(repository.KitchenEvents(Cook), e => e.KayitNo == eventItem.KayitNo);
+        repository.RemoveOrder(line.KayitNo, new() { Tip = SiparisCikarmaTipi.Zayi,
+            Gerekce = "Döküldü" }, Admin);
+        Assert.Contains(repository.KitchenEvents(Cook), e => e.Islem == "Zayi" && e.AdisyonNo == receipt.KayitNo);
+        Assert.Equal(320m, repository.DailyReport(repository.BusinessToday, Admin).Mutabakat.ZayiTutari);
     }
 
     [Fact]
@@ -122,7 +157,8 @@ public sealed class RepositoryTests
         repository.UpdateOrder(line.KayitNo, new() { Miktar = 1, Ikram = false }, Admin);
         repository.Pay(12, new() { BaslikKayitNo = receipt.KayitNo, NakitTutar = 100, KismiOdeme = true }, Admin);
         Assert.Equal(409, Assert.Throws<ApiException>(() => repository.UpdateOrder(line.KayitNo, new() { Miktar = 1, Ikram = true }, Admin)).Status);
-        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.DeleteOrder(line.KayitNo, Admin)).Status);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.RemoveOrder(line.KayitNo,
+            new() { Tip = SiparisCikarmaTipi.Iptal, Gerekce = "Hatalı giriş" }, Admin)).Status);
         Assert.Equal(320m, repository.Receipt(12)!.GenelToplam);
         repository.Pay(12, new() { BaslikKayitNo = receipt.KayitNo, NakitTutar = 220 }, Admin);
         Assert.Null(repository.Receipt(12));
@@ -231,17 +267,18 @@ public sealed class RepositoryTests
     }
 
     [Fact]
-    public void ReportAndReservationDaysUseIstanbulMidnightNotUtc()
+    public void ReportUsesBusinessDayAndReservationUsesCalendarDay()
     {
         // 21:30 UTC on Nov 5 is 00:30 Istanbul on Nov 6.
         var clock = new FixedClock(new DateTimeOffset(2026, 11, 5, 21, 30, 0, TimeSpan.Zero));
         var repository = new RestaurantRepository(new(true), clock);
         var localDay = new DateOnly(2026, 11, 6);
-        Assert.Equal(localDay, repository.BusinessToday);
-        var report = repository.DailyReport(localDay, Admin);
+        var businessDay = localDay.AddDays(-1);
+        Assert.Equal(businessDay, repository.BusinessToday);
+        var report = repository.DailyReport(businessDay, Admin);
         Assert.Equal(480m, report.ToplamCiro); // Closed demo receipt.
         Assert.Equal(0, Assert.Single(report.SaatlikCiro).Saat);
-        Assert.Equal(0m, repository.DailyReport(localDay.AddDays(-1), Admin).ToplamCiro);
+        Assert.Equal(0m, repository.DailyReport(localDay, Admin).ToplamCiro);
         var reservation = repository.Reserve(new() { MasaKayitNo = 12, MusteriAdi = "Ada", KisiSayisi = 2,
             RezervasyonTarihi = new DateTime(2026, 11, 6, 22, 0, 0, DateTimeKind.Utc) }, Admin);
         Assert.Empty(repository.Reservations(localDay, Admin));
@@ -249,9 +286,26 @@ public sealed class RepositoryTests
         Assert.Equal(DateTimeKind.Utc, reservation.RezervasyonTarihi.Kind);
     }
 
+    [Fact]
+    public void ShiftCloseRequiresCompletedDayAndRecordsCashDifferenceOnce()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 11, 5, 21, 30, 0, TimeSpan.Zero));
+        var repository = new RestaurantRepository(new(true), clock);
+        var request = new VardiyaKapanisRequest { IsletmeTarihi = repository.BusinessToday, SayilanNakit = 15m };
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.CloseShift(request, Admin)).Status);
+        clock.Current = new DateTimeOffset(2026, 11, 6, 1, 30, 0, TimeSpan.Zero);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.CloseShift(request, Waiter)).Status);
+        var close = repository.CloseShift(request, Admin);
+        Assert.Equal(15m, close.NakitFarki);
+        Assert.Equal(close.KapanisZamani,
+            repository.DailyReport(request.IsletmeTarihi, Admin).VardiyaKapanisi!.KapanisZamani);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.CloseShift(request, Admin)).Status);
+    }
+
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => now;
+        public DateTimeOffset Current { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => Current;
     }
 
     [Fact]

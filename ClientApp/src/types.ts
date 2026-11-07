@@ -22,9 +22,11 @@ export interface Receipt {
   Detaylar:OrderLine[];
 }
 export interface KitchenTicket {BaslikKayitNo:number;MasaAdi:string;BolumAdi:string;SiparisZamani:string;BeklemeSuresi:number;Satirlar:{DetayKayitNo:number;StokAdi:string;Miktar:number;KalanMiktar:number;SatirAciklama:string|null}[]}
-export interface Reconciliation {KapananSatis:number;Tahsilat:number;Fark:number;Nakit:number;Banka:number;YemekKarti:number;Cari:number;Indirim:number;SilinenUrunTutari:number;IkramTutari:number;OdemeSayisi:number}
+export interface KitchenEvent {KayitNo:number;AdisyonNo:number;MasaAdi:string;UrunAdi:string;Islem:string;Miktar:number;Not:string|null;Tarih:string;Goruldu:boolean}
+export interface Reconciliation {KapananSatis:number;Tahsilat:number;Fark:number;Nakit:number;Banka:number;YemekKarti:number;Cari:number;Indirim:number;SilinenUrunTutari:number;IptalTutari:number;ZayiTutari:number;IkramTutari:number;OdemeSayisi:number}
 export interface AuditEntry {KayitNo:number;Tarih:string;Islem:string;Aciklama:string;AdisyonNo:number|null;PersonelId:number;PersonelAdi:string;Tutar:number}
-export interface Report {ToplamCiro:number;ToplamAdisyon:number;AcikAdisyon:number;NakitToplam:number;BankaToplam:number;CariToplam:number;YemekKartiToplam:number;IndirimToplam:number;SaatlikCiro:{Saat:number;Ciro:number;AdisyonSayisi:number}[];EnCokSatan:{StokAdi:string;ToplamMiktar:number;ToplamTutar:number}[];Mutabakat:Reconciliation}
+export interface ShiftClose {IsletmeTarihi:string;KapanisZamani:string;PersonelAdi:string;BeklenenNakit:number;SayilanNakit:number;NakitFarki:number;Aciklama:string|null}
+export interface Report {IsletmeTarihi:string;Bugun:string;BaslangicSaati:number;VardiyaKapanisi:ShiftClose|null;ToplamCiro:number;ToplamAdisyon:number;AcikAdisyon:number;NakitToplam:number;BankaToplam:number;CariToplam:number;YemekKartiToplam:number;IndirimToplam:number;SaatlikCiro:{Saat:number;Ciro:number;AdisyonSayisi:number}[];EnCokSatan:{StokAdi:string;ToplamMiktar:number;ToplamTutar:number}[];Mutabakat:Reconciliation}
 export interface Reservation {KayitNo:number;MasaKayitNo:number;MasaAdi:string;MusteriAdi:string;Telefon:string;RezervasyonTarihi:string;KisiSayisi:number;Aciklama:string}
 export type DeliveryStatus=0|1|2|3|4;
 export interface DeliveryLine {StokKayitNo:number;StokAdi:string;PorsiyonKayitNo:number|null;PorsiyonAdi:string|null;Miktar:number;BirimFiyat:number;SatirTutari:number}

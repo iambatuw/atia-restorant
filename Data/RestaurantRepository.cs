@@ -35,8 +35,11 @@ public sealed class RestaurantRepository
     private readonly Dictionary<string, PosIslemKayitDTO> _posTransactions = [];
     private readonly Dictionary<string, string> _posIdempotency = [];
     private readonly List<IslemKaydiDTO> _audit = [];
+    private readonly List<MutfakBildirimDTO> _kitchenEvents = [];
+    private readonly Dictionary<DateOnly, VardiyaKapanisDTO> _shiftClosings = [];
     private readonly HashSet<long> _mergedReceipts = [];
-    private long _nextAudit;
+    private long _nextAudit, _nextKitchenEvent;
+    private readonly int _businessDayStartHour;
     private long _nextReceipt = 1000, _nextLine = 10000, _nextReservation = 100, _nextDelivery = 3000;
     private DateTime Now => _clock.GetUtcNow().UtcDateTime;
     private static readonly TimeZoneInfo RestaurantTimeZone = FindRestaurantTimeZone();
@@ -48,13 +51,17 @@ public sealed class RestaurantRepository
     }
     private static DateTime RestaurantTime(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(
         DateTime.SpecifyKind(utc, DateTimeKind.Utc), RestaurantTimeZone);
-    private static DateOnly BusinessDate(DateTime utc) => DateOnly.FromDateTime(RestaurantTime(utc));
+    private DateOnly BusinessDate(DateTime utc) => DateOnly.FromDateTime(RestaurantTime(utc).AddHours(-_businessDayStartHour));
     public DateOnly BusinessToday => BusinessDate(Now);
+    public int BusinessDayStartHour => _businessDayStartHour;
 
-    public RestaurantRepository(BackendMode mode, TimeProvider clock)
+    public RestaurantRepository(BackendMode mode, TimeProvider clock, IConfiguration? configuration = null)
     {
         _mode = mode;
         _clock = clock;
+        var hour = configuration?.GetValue<int?>("Restaurant:BusinessDayStartHour") ?? 4;
+        if (hour is < 0 or > 23) throw new InvalidOperationException("BusinessDayStartHour must be 0-23.");
+        _businessDayStartHour = hour;
         if (mode.IsDemo) Seed();
     }
 
@@ -80,6 +87,25 @@ public sealed class RestaurantRepository
     }
     private static void Staff(StaffActor actor, params string[] roles) =>
         Require(actor.Id > 0 && roles.Contains(actor.Role), "Bu işlem için yetkiniz yok.", 403);
+    private static void Permission(StaffActor actor, string action)
+    {
+        var allowed = action switch
+        {
+            "order" => actor.Role is "Admin" or "Garson",
+            "cancel" => actor.Role is "Admin" or "Garson",
+            "waste" or "gift" or "payment" => actor.Role == "Admin",
+            "kitchen" => actor.Role is "Admin" or "Mutfak",
+            _ => false
+        };
+        Require(actor.Id > 0 && allowed, "Bu işlem için yetkiniz yok.", 403);
+    }
+    private void KitchenEvent(AdisyonBaslikDTO receipt, AdisyonDetayDTO line, string action, decimal quantity,
+        string? note = null) => _kitchenEvents.Add(new MutfakBildirimDTO
+    {
+        KayitNo = ++_nextKitchenEvent, AdisyonNo = receipt.KayitNo, MasaAdi = receipt.MasaAdi ?? "",
+        UrunAdi = line.StokAdi ?? "", Islem = action, Miktar = quantity,
+        Not = note ?? line.SatirAciklama, Tarih = Now
+    });
     private void Log(StaffActor actor, string action, string detail, long? receiptId = null, decimal amount = 0,
         OdemeRequest? payment = null) => _audit.Add(new IslemKaydiDTO
     {
@@ -209,9 +235,9 @@ public sealed class RestaurantRepository
 
     public AdisyonBaslikDTO AddOrder(SiparisEkleRequest request, StaffActor actor) => Change(() =>
     {
-        Staff(actor, "Garson", "Admin");
+        Permission(actor, "order");
         Quantity(request.Miktar); Note(request.SatirAciklama);
-        Require(!request.Ikram || actor.IsAdmin, "İkram yalnızca yönetici tarafından verilebilir.", 403);
+        if (request.Ikram) Permission(actor, "gift");
         Require(!request.StokEkstra && string.IsNullOrWhiteSpace(request.StokEkstraAdi), "Serbest fiyatlı/ekstra ürünler desteklenmiyor.");
         var table = Table(request.MasaKayitNo);
         Require(!table.BirlesmisMasa && !table.AnaMasa, "Birleşmiş masa desteklenmiyor.", 409);
@@ -237,22 +263,25 @@ public sealed class RestaurantRepository
         _ready[line.KayitNo] = 0;
         Recalculate(receipt);
         Log(actor, "Ürün eklendi", $"{receipt.MasaAdi}: {line.Miktar} × {line.StokAdi}", receipt.KayitNo, line.SatirTutari);
+        KitchenEvent(receipt, line, "Eklendi", line.Miktar);
         return receipt;
     });
 
     public AdisyonBaslikDTO UpdateOrder(long id, SiparisGuncelleRequest request, StaffActor actor) => Change(() =>
     {
-        Staff(actor, "Garson", "Admin");
+        Permission(actor, "order");
         Require(request.DetayKayitNo == 0 || request.DetayKayitNo == id, "URL ve sipariş kimliği uyuşmuyor.");
         Quantity(request.Miktar); Note(request.SatirAciklama);
         var (receipt, line) = Line(id);
-        Require(actor.IsAdmin || (request.Ikram == line.Ikram && (!line.Ikram || request.Miktar <= line.Miktar)), "İkram yalnızca yönetici tarafından artırılabilir veya değiştirilebilir.", 403);
+        if (request.Ikram != line.Ikram || (line.Ikram && request.Miktar > line.Miktar)) Permission(actor, "gift");
         var paid = (receipt.NakitToplam ?? 0) + (receipt.BankaToplam ?? 0) + (receipt.CariToplam ?? 0) + (receipt.YemekKartiToplam ?? 0) + (receipt.IndirimToplam ?? 0);
         var newLineTotal = request.Ikram ? 0 : decimal.Round(request.Miktar * line.BirimFiyat, 2, MidpointRounding.AwayFromZero);
         Require(receipt.GenelToplam - line.SatirTutari + newLineTotal >= paid, "Sipariş toplamı alınmış ödemeden düşük olamaz.", 409);
         // Clamp on reduction so decreasing then increasing never resurrects readiness.
         _ready[id] = Math.Min(_ready.GetValueOrDefault(id), request.Miktar);
         var previousAmount = line.SatirTutari;
+        var previousQuantity = line.Miktar;
+        var previousNote = line.SatirAciklama;
         var wasGift = line.Ikram;
         line.Miktar = request.Miktar;
         line.SatirAciklama = request.SatirAciklama?.Trim();
@@ -262,25 +291,39 @@ public sealed class RestaurantRepository
             Log(actor, line.Ikram ? "İkram verildi" : "İkram kaldırıldı",
                 $"{receipt.MasaAdi}: {line.StokAdi}", receipt.KayitNo, line.Ikram ? previousAmount : line.SatirTutari);
         else Log(actor, "Ürün değiştirildi", $"{receipt.MasaAdi}: {line.StokAdi}, adet {line.Miktar}", receipt.KayitNo);
+        if (previousQuantity != line.Miktar || previousNote != line.SatirAciklama)
+            KitchenEvent(receipt, line, previousQuantity == line.Miktar ? "Not değişti" :
+                line.Miktar < previousQuantity ? "Azaltıldı" : "Artırıldı",
+                previousQuantity == line.Miktar ? line.Miktar : Math.Abs(line.Miktar - previousQuantity),
+                line.SatirAciklama);
         return receipt;
     });
 
-    public AdisyonBaslikDTO DeleteOrder(long id, StaffActor actor) => Change(() =>
+    public AdisyonBaslikDTO RemoveOrder(long id, SiparisCikarmaRequest request, StaffActor actor) => Change(() =>
     {
-        Staff(actor, "Garson", "Admin");
+        Require(Enum.IsDefined(request.Tip), "İşlem türü geçersiz.");
+        Permission(actor, request.Tip == SiparisCikarmaTipi.Zayi ? "waste" : "cancel");
+        Require(!string.IsNullOrWhiteSpace(request.Gerekce) && request.Gerekce.Trim().Length is <= 200,
+            "Gerekçe 1–200 karakter olmalı.");
         var (receipt, line) = Line(id);
-        var paid = (receipt.NakitToplam ?? 0) + (receipt.BankaToplam ?? 0) + (receipt.CariToplam ?? 0) + (receipt.YemekKartiToplam ?? 0) + (receipt.IndirimToplam ?? 0);
-        Require(receipt.GenelToplam - line.SatirTutari >= paid, "Sipariş toplamı alınmış ödemeden düşük olamaz.", 409);
-        Log(actor, "Ürün silindi", $"{receipt.MasaAdi}: {line.Miktar} × {line.StokAdi}", receipt.KayitNo, line.SatirTutari);
-        receipt.Detaylar.Remove(line); _ready.Remove(id);
+        var paid = (receipt.NakitToplam ?? 0) + (receipt.BankaToplam ?? 0) +
+            (receipt.CariToplam ?? 0) + (receipt.YemekKartiToplam ?? 0) + (receipt.IndirimToplam ?? 0);
+        Require(receipt.GenelToplam - line.SatirTutari >= paid,
+            "İşlem sonrası adisyon toplamı alınmış ödemeden düşük olamaz.", 409);
+        var action = request.Tip == SiparisCikarmaTipi.Zayi ? "Zayi kaydedildi" : "Ürün iptal edildi";
+        KitchenEvent(receipt, line, request.Tip == SiparisCikarmaTipi.Zayi ? "Zayi" : "İptal", line.Miktar,
+            request.Gerekce.Trim());
+        Log(actor, action, $"{receipt.MasaAdi}: {line.Miktar} × {line.StokAdi} · {request.Gerekce.Trim()}",
+            receipt.KayitNo, line.SatirTutari);
+        receipt.Detaylar.Remove(line);
+        _ready.Remove(id);
         Recalculate(receipt);
-        // Keep even an empty receipt open until an administrator explicitly closes it.
         return receipt;
     });
 
     public AdisyonBaslikDTO Pay(long tableId, OdemeRequest request, StaffActor actor) => Change(() =>
     {
-        Staff(actor, "Admin"); Table(tableId);
+        Permission(actor, "payment"); Table(tableId);
         var receipt = Open(tableId) ?? throw new ApiException(409, "Masada açık adisyon yok; ödeme yinelenmiş olabilir.");
         Require(receipt.KayitNo == request.BaslikKayitNo, "Adisyon değişti; güncel adisyonu yükleyin.", 409);
         decimal[] values = [request.NakitTutar, request.BankaTutar, request.CariTutar, request.YemekKartiTutar, request.IndirimTutar];
@@ -452,13 +495,15 @@ public sealed class RestaurantRepository
 
         var masterTable = Table(request.AnaMasaKayitNo);
         var masterReceipt = Open(masterTable.MasaId) ?? throw new ApiException(409, "Ana masada açık adisyon bulunamadı.");
-
-        foreach (var childTableId in request.BirlestirilecekMasaKayitNolar)
+        var children = request.BirlestirilecekMasaKayitNolar.Select(childTableId =>
         {
             var childTable = Table(childTableId);
             var childReceipt = Open(childTable.MasaId) ?? throw new ApiException(409, $"Masa {childTable.MasaAdi} üzerinde açık adisyon bulunamadı.");
             Require(childReceipt.KayitNo != masterReceipt.KayitNo, "Birleştirilecek adisyon ana adisyon ile aynı olamaz.");
-
+            return childReceipt;
+        }).ToList();
+        foreach (var childReceipt in children)
+        {
             foreach (var line in childReceipt.Detaylar)
             {
                 var newLine = Copy(line);
@@ -575,9 +620,34 @@ public sealed class RestaurantRepository
                 YazdirilanMiktar = d.YazdirilanMiktar ?? 0, HazirMiktar = _ready.GetValueOrDefault(d.KayitNo),
                 SatirAciklama = d.SatirAciklama, PersonelAdi = d.PersonelAdi }).ToList() }).ToList());
 
+    public List<MutfakBildirimDTO> KitchenEvents(StaffActor actor) => Read(() =>
+    {
+        Permission(actor, "kitchen");
+        return _kitchenEvents.Where(item => !item.Goruldu).OrderBy(item => item.KayitNo).ToList();
+    });
+
+    public MutfakBildirimDTO AcknowledgeKitchenEvent(long id, StaffActor actor) => Change(() =>
+    {
+        Permission(actor, "kitchen");
+        var item = _kitchenEvents.FirstOrDefault(e => e.KayitNo == id)
+            ?? throw new ApiException(404, "Mutfak bildirimi bulunamadı.");
+        Require(!item.Goruldu, "Bildirim zaten görüldü.", 409);
+        item.Goruldu = true;
+        return item;
+    });
+
+    public AdisyonBaslikDTO MarkLineReady(long id, StaffActor actor) => Change(() =>
+    {
+        Permission(actor, "kitchen");
+        var (receipt, line) = Line(id);
+        Require(_ready.GetValueOrDefault(id) < line.Miktar, "Ürün zaten hazır.", 409);
+        _ready[id] = line.Miktar;
+        return receipt;
+    });
+
     public AdisyonBaslikDTO MarkReady(long receiptId, StaffActor actor) => Change(() =>
     {
-        Staff(actor, "Mutfak", "Admin");
+        Permission(actor, "kitchen");
         var receipt = _receipts.FirstOrDefault(r => r.KayitNo == receiptId)
             ?? throw new ApiException(404, "Adisyon bulunamadı.");
         Require(!receipt.Kapali, "Kapalı adisyon hazırlanamaz.", 409);
@@ -598,6 +668,8 @@ public sealed class RestaurantRepository
         var account = payments.Sum(item => item.Cari);
         var sales = closed.Sum(r => r.GenelToplam - (r.IndirimToplam ?? 0));
         return new GunlukRaporDTO {
+            IsletmeTarihi = date, Bugun = BusinessToday, BaslangicSaati = _businessDayStartHour,
+            VardiyaKapanisi = _shiftClosings.GetValueOrDefault(date),
             ToplamCiro = closed.Sum(r => r.GenelToplam - (r.IndirimToplam ?? 0)), ToplamAdisyon = closed.Count,
             AcikAdisyon = _receipts.Count(r => !r.Kapali && BusinessDate(r.KayitTarihi!.Value) == date),
             NakitToplam = closed.Sum(r => r.NakitToplam ?? 0), BankaToplam = closed.Sum(r => r.BankaToplam ?? 0),
@@ -614,15 +686,37 @@ public sealed class RestaurantRepository
                 Nakit = cash, Banka = bank, YemekKarti = meal, Cari = account,
                 Indirim = payments.Sum(item => item.Indirim), OdemeSayisi = payments.Count,
                 SilinenUrunTutari = entries.Where(item => item.Islem == "Ürün silindi").Sum(item => item.Tutar),
+                IptalTutari = entries.Where(item => item.Islem == "Ürün iptal edildi").Sum(item => item.Tutar),
+                ZayiTutari = entries.Where(item => item.Islem == "Zayi kaydedildi").Sum(item => item.Tutar),
                 IkramTutari = entries.Where(item => item.Islem == "İkram verildi").Sum(item => item.Tutar)
             }
         };
     });
 
+    public VardiyaKapanisDTO CloseShift(VardiyaKapanisRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        Require(request.IsletmeTarihi != default && request.IsletmeTarihi < BusinessToday,
+            "Yalnızca tamamlanmış işletme günü kapatılabilir.");
+        Require(!_shiftClosings.ContainsKey(request.IsletmeTarihi), "Bu işletme günü zaten kapatıldı.", 409);
+        Require(request.SayilanNakit >= 0 && request.SayilanNakit <= 10000000m &&
+            decimal.Round(request.SayilanNakit, 2) == request.SayilanNakit, "Sayılan nakit geçersiz.");
+        Note(request.Aciklama);
+        var expected = _audit.Where(item => BusinessDate(item.Tarih) == request.IsletmeTarihi &&
+            item.Islem == "Ödeme alındı").Sum(item => item.Nakit);
+        var close = new VardiyaKapanisDTO { IsletmeTarihi = request.IsletmeTarihi,
+            KapanisZamani = Now, PersonelId = actor.Id, PersonelAdi = actor.Name,
+            BeklenenNakit = expected, SayilanNakit = request.SayilanNakit,
+            NakitFarki = request.SayilanNakit - expected, Aciklama = request.Aciklama?.Trim() };
+        _shiftClosings.Add(request.IsletmeTarihi, close);
+        Log(actor, "Vardiya kapatıldı", $"{request.IsletmeTarihi}: sayılan nakit {request.SayilanNakit:n2}");
+        return close;
+    });
+
     public List<RezervasyonDTO> Reservations(DateOnly? date, StaffActor actor) => Read(() =>
     {
         Staff(actor, "Admin");
-        return _reservations.Where(r => date is null || BusinessDate(r.RezervasyonTarihi) == date)
+        return _reservations.Where(r => date is null || DateOnly.FromDateTime(RestaurantTime(r.RezervasyonTarihi)) == date)
             .OrderBy(r => r.RezervasyonTarihi).ToList();
     });
     public RezervasyonDTO Reserve(RezervasyonEkleRequest request, StaffActor actor) => Change(() =>

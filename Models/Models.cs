@@ -104,6 +104,26 @@ public class SiparisGuncelleRequest
     public bool Ikram { get; set; }
 }
 
+public enum SiparisCikarmaTipi { Iptal, Zayi }
+public class SiparisCikarmaRequest
+{
+    public SiparisCikarmaTipi Tip { get; set; }
+    public string Gerekce { get; set; } = "";
+}
+
+public class MutfakBildirimDTO
+{
+    public long KayitNo { get; set; }
+    public long AdisyonNo { get; set; }
+    public string MasaAdi { get; set; } = "";
+    public string UrunAdi { get; set; } = "";
+    public string Islem { get; set; } = "";
+    public decimal Miktar { get; set; }
+    public string? Not { get; set; }
+    public DateTime Tarih { get; set; }
+    public bool Goruldu { get; set; }
+}
+
 // ───── ÖDEME ─────
 public class OdemeRequest
 {
@@ -369,6 +389,10 @@ public class ApiResult
 // ───── RAPOR ─────
 public class GunlukRaporDTO
 {
+    public DateOnly IsletmeTarihi { get; set; }
+    public DateOnly Bugun { get; set; }
+    public int BaslangicSaati { get; set; }
+    public VardiyaKapanisDTO? VardiyaKapanisi { get; set; }
     public decimal ToplamCiro { get; set; }
     public int ToplamAdisyon { get; set; }
     public int AcikAdisyon { get; set; }
@@ -380,6 +404,25 @@ public class GunlukRaporDTO
     public List<SaatlikCiroDTO> SaatlikCiro { get; set; } = new();
     public List<UrunSatisDTO> EnCokSatan { get; set; } = new();
     public GunlukMutabakatDTO Mutabakat { get; set; } = new();
+}
+
+public class VardiyaKapanisRequest
+{
+    public DateOnly IsletmeTarihi { get; set; }
+    public decimal SayilanNakit { get; set; }
+    public string? Aciklama { get; set; }
+}
+
+public class VardiyaKapanisDTO
+{
+    public DateOnly IsletmeTarihi { get; set; }
+    public DateTime KapanisZamani { get; set; }
+    public int PersonelId { get; set; }
+    public string PersonelAdi { get; set; } = "";
+    public decimal BeklenenNakit { get; set; }
+    public decimal SayilanNakit { get; set; }
+    public decimal NakitFarki { get; set; }
+    public string? Aciklama { get; set; }
 }
 
 public class IslemKaydiDTO
@@ -410,6 +453,8 @@ public class GunlukMutabakatDTO
     public decimal Cari { get; set; }
     public decimal Indirim { get; set; }
     public decimal SilinenUrunTutari { get; set; }
+    public decimal IptalTutari { get; set; }
+    public decimal ZayiTutari { get; set; }
     public decimal IkramTutari { get; set; }
     public int OdemeSayisi { get; set; }
 }

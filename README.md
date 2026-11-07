@@ -13,10 +13,10 @@ Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük ra
 
 | Alan | Demo ortamında yapabilecekleriniz | Sınır |
 | --- | --- | --- |
-| Masalar ve adisyon | Bölüm veya duruma göre masa bulma; ürün, porsiyon ve sipariş notu ekleme; adet değiştirme; ödeme alma; masa taşıma, ayırma ve birleştirme | İşlemler bellekte tutulur. Sunucu yeniden başlayınca sıfırlanır. |
-| Mutfak | Açık adisyonlardan gelen ürünleri ve notları görme, fişi hazır işaretleme | Gerçek mutfak yazıcısı bağlı değildir. |
+| Masalar ve adisyon | Bölüm veya duruma göre masa bulma; ürün, porsiyon ve sipariş notu ekleme; adet değiştirme; gerekçeli iptal veya zayi; ödeme alma; masa taşıma, ayırma ve birleştirme | İşlemler bellekte tutulur. Sunucu yeniden başlayınca sıfırlanır. |
+| Mutfak | Ürünleri ayrı ayrı hazır işaretleme; ekleme, değişiklik, iptal ve zayi bildirimlerini görme veya tarayıcıdan yazdırma | Yazdırma tarayıcının yazdırma penceresini açar; fiziksel çıktı doğrulanmaz. |
 | Paket servis | Müşteri, telefon, adres, ürün ve ödeme şekliyle sipariş açma; kurye atayıp siparişi hazırlama, yola çıkarma ve teslim etme | Manuel demo akışıdır. Çevrim içi sipariş sağlayıcılarından otomatik kayıt almaz. |
-| Günlük rapor | Kapanan satışları, ödeme türlerini, saatlik tutarları, çok satan ürünleri, işlem geçmişini ve gün sonu mutabakatını görme | Paket servis kayıtları henüz bu rapora katılmaz. İşlem geçmişi demo sunucusu yeniden başlayınca sıfırlanır. |
+| Günlük rapor | İşletme gününe göre satışları, ödeme türlerini, saatlik tutarları, iptal/zayi, işlem geçmişini ve mutabakatı görme | Paket servis kayıtları henüz bu rapora katılmaz. İşlem geçmişi demo sunucusu yeniden başlayınca sıfırlanır. |
 | Rezervasyon | Tarihe göre kayıt görme, yeni rezervasyon açma ve iptal etme | Az kullanılan bir akış olduğu için ikincil menüdedir. |
 | Menü | Personelin ürünleri araması; müşterinin `/menu` adresinden ürün ve fiyatları görmesi | Müşteri menüsü sipariş göndermez; ürün düzenleme ekranı henüz yoktur. |
 | POS | Adisyon ödemesinde manuel POS veya Hugin S1/PayGo için örnek işlem ve sonuç sorgulama | Fiziksel terminale bağlanmaz. Onay adımı simülasyondur. |
@@ -27,7 +27,7 @@ Garson veya yönetici masayı seçip menüden ürün ekleyebilir. Porsiyon ve si
 
 Ödeme ekranı nakit, banka kartı, yemek kartı, cari ve indirim tutarlarını ayrı alır. Kısmi ödeme yapılırsa kalan tutar adisyonda görünür; tutar tamamlandığında adisyon kapanır. Sunucu ürün fiyatını ve ödeme toplamını denetler. Hugin S1 ve PayGo seçimi, gerçek cihazla konuşan bir bağlantı değil, işlem durumlarını denemek için hazırlanmış simülasyondur.
 
-Yönetici günlük raporda ürün silme, ikram, ödeme ve masa işlemlerini yapan personeli görebilir. Silinen ürünün tutarı ayrı gösterilir; indirim ve ikram da mutabakatta görünür. Mutabakat, o gün kapanan adisyon satışını o gün alınan ödemelerle karşılaştırır; farklı günlere yayılan kısmi ödemeler fark oluşturabilir. Fiziksel POS veya banka iadesi henüz uygulanmadı. Bu kayıtlar da demo belleğindedir, kalıcı denetim kaydı sayılmaz.
+Yönetici günlük raporda gerekçeli iptal, zayi, ikram, ödeme ve masa işlemlerini yapan personeli görebilir. İptal ve zayi tutarları ayrı gösterilir. İşletme günü varsayılan olarak 04.00'te başlar; `Restaurant__BusinessDayStartHour` ortam değişkeniyle 0–23 arasında ayarlanabilir. Tamamlanmış bir işletme günü için yönetici sayılan nakdi girip vardiyayı bir kez kapatabilir; rapor beklenen nakit ile farkı gösterir. Rezervasyonlar normal takvim gününü kullanır. Fiziksel POS veya banka iadesi henüz uygulanmadı. Bu kayıtlar da demo belleğindedir, kalıcı denetim kaydı sayılmaz.
 
 ### Paket siparişinin yolu
 
@@ -42,7 +42,7 @@ Yeni siparişte müşteri ve teslimat bilgileriyle ürünleri girersiniz. Sipari
 | Mutfak (`mutfak`) | Mutfak fişleri ve menü. |
 | Müşteri | Giriş yapmadan `/menu` adresindeki salt okunur menü. |
 
-Personel ekranları telefonda ve masaüstünde açılır. Açık ve koyu tema bulunur. Sunucu, değişikliklerden sonra SignalR üzerinden personel ekranlarına yenileme sinyali gönderir.
+İşlem izinleri sunucuda ayrı denetlenir: garson sipariş ve gerekçeli iptal yapar; zayi, ikram ve ödeme yöneticiye; ürün hazırlığı ve mutfak bildirimleri mutfak personeli ile yöneticiye açıktır. Personel ekranları telefonda ve masaüstünde açılır. Açık ve koyu tema bulunur. Sunucu, değişikliklerden sonra SignalR üzerinden personel ekranlarına yenileme sinyali gönderir.
 
 ## Yerelde çalıştırma
 
@@ -108,7 +108,7 @@ npm test
 npm run build
 ```
 
-8 Kasım 2026 kontrolünde 28 API ve 16 arayüz testi geçti; üretim derlemesi de tamamlandı. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
+8 Kasım 2026 kontrolünde 32 API ve 16 arayüz testi geçti; üretim derlemesi de tamamlandı. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
 
 ## Canlı kullanımdan önce
 

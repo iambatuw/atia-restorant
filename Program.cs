@@ -149,8 +149,8 @@ api.MapPost("/siparisler", (SiparisEkleRequest request, ClaimsPrincipal user, Re
 api.MapPatch("/siparisler/{id:long}", (long id, SiparisGuncelleRequest request, ClaimsPrincipal user,
     RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
     Mutate(() => repository.UpdateOrder(id, request, Actor(user)), hub, logs)).RequireAuthorization("Orders");
-api.MapDelete("/siparisler/{id:long}", (long id, ClaimsPrincipal user, RestaurantRepository repository,
-    IHubContext<RestorantHub> hub, ILoggerFactory logs) => Mutate(() => repository.DeleteOrder(id, Actor(user)), hub, logs))
+api.MapPost("/siparisler/{id:long}/cikar", (long id, SiparisCikarmaRequest request, ClaimsPrincipal user, RestaurantRepository repository,
+    IHubContext<RestorantHub> hub, ILoggerFactory logs) => Mutate(() => repository.RemoveOrder(id, request, Actor(user)), hub, logs))
     .RequireAuthorization("Orders");
 api.MapPost("/masalar/{id:long}/odeme", (long id, OdemeRequest request, ClaimsPrincipal user,
     RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
@@ -176,6 +176,15 @@ api.MapPost("/pos/islem/{islemId}/simule-onay", (string islemId, bool? basarili,
     .RequireAuthorization("Orders");
 api.MapGet("/mutfak", (RestaurantRepository repository) => Results.Ok(ApiResult<List<MutfakSiparisDTO>>.Ok(repository.Kitchen())))
     .RequireAuthorization("Kitchen");
+api.MapGet("/mutfak/bildirimler", (ClaimsPrincipal user, RestaurantRepository repository) =>
+    Results.Ok(ApiResult<List<MutfakBildirimDTO>>.Ok(repository.KitchenEvents(Actor(user)))))
+    .RequireAuthorization("Kitchen");
+api.MapPost("/mutfak/bildirimler/{id:long}/goruldu", (long id, ClaimsPrincipal user, RestaurantRepository repository,
+    IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+    Mutate(() => repository.AcknowledgeKitchenEvent(id, Actor(user)), hub, logs)).RequireAuthorization("Kitchen");
+api.MapPost("/mutfak/satirlar/{id:long}/hazir", (long id, ClaimsPrincipal user, RestaurantRepository repository,
+    IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+    Mutate(() => repository.MarkLineReady(id, Actor(user)), hub, logs)).RequireAuthorization("Kitchen");
 api.MapPost("/mutfak/{baslikId:long}/hazir", (long baslikId, ClaimsPrincipal user, RestaurantRepository repository,
     IHubContext<RestorantHub> hub, ILoggerFactory logs) => Mutate(() => repository.MarkReady(baslikId, Actor(user)), hub, logs))
     .RequireAuthorization("Kitchen");
@@ -185,6 +194,9 @@ api.MapGet("/raporlar/gunluk", (string? tarih, ClaimsPrincipal user, RestaurantR
 api.MapGet("/raporlar/islemler", (string? tarih, ClaimsPrincipal user, RestaurantRepository repository) =>
     Results.Ok(ApiResult<List<IslemKaydiDTO>>.Ok(repository.Audit(ParseDate(tarih) ?? repository.BusinessToday, Actor(user)))))
     .RequireAuthorization("Admin");
+api.MapPost("/raporlar/vardiya-kapat", (VardiyaKapanisRequest request, ClaimsPrincipal user,
+    RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+    Mutate(() => repository.CloseShift(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
 api.MapGet("/rezervasyonlar", (string? tarih, ClaimsPrincipal user, RestaurantRepository repository) =>
     Results.Ok(ApiResult<List<RezervasyonDTO>>.Ok(repository.Reservations(ParseDate(tarih), Actor(user)))))
     .RequireAuthorization("Admin");

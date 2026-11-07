@@ -75,9 +75,11 @@ public sealed class HttpContractTests
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/raporlar/islemler")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/masalar/1/odeme", new OdemeRequest())).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/mutfak")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/mutfak/bildirimler")).StatusCode);
         await Login(client, "mutfak");
         var kitchen = await client.GetAsync("/api/mutfak");
         Assert.Equal(HttpStatusCode.OK, kitchen.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/mutfak/bildirimler")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/raporlar/islemler")).StatusCode);
         var tickets = (await kitchen.Content.ReadFromJsonAsync<ApiResult<List<MutfakSiparisDTO>>>(Json))!.Data!;
         Assert.Equal(2, tickets.Count);
@@ -109,6 +111,25 @@ public sealed class HttpContractTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.DoesNotContain("Exception", await response.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/raporlar/gunluk?tarih=wrong")).StatusCode);
+    }
+
+    [Fact]
+    public async Task HttpCancellationRequiresReasonAndWasteNeedsAdmin()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        await Login(client, "garson");
+        var created = await client.PostAsJsonAsync("/api/siparisler", new SiparisEkleRequest
+            { MasaKayitNo = 12, StokKayitNo = 4, Miktar = 1 });
+        var receipt = (await created.Content.ReadFromJsonAsync<ApiResult<AdisyonBaslikDTO>>(Json))!.Data!;
+        var lineId = Assert.Single(receipt.Detaylar).KayitNo;
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync($"/api/siparisler/{lineId}/cikar",
+            new SiparisCikarmaRequest())).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/siparisler/{lineId}/cikar",
+            new SiparisCikarmaRequest { Tip = SiparisCikarmaTipi.Zayi, Gerekce = "Döküldü" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/siparisler/{lineId}/cikar",
+            new SiparisCikarmaRequest { Tip = SiparisCikarmaTipi.Iptal, Gerekce = "Müşteri vazgeçti" })).StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await client.DeleteAsync($"/api/siparisler/{lineId}")).StatusCode);
     }
 
     [Fact]

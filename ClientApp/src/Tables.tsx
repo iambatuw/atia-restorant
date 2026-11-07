@@ -109,6 +109,8 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
   const [split,setSplit]=useState(false);
   const [merge,setMerge]=useState(false);
   const [cancel,setCancel]=useState<OrderLine|null>(null);
+  const [removalReason,setRemovalReason]=useState('');
+  const [removalType,setRemovalType]=useState<0|1>(0);
   const [note,setNote]=useState('');
   const [portionProduct,setPortionProduct]=useState<Product|null>(null);
 
@@ -219,9 +221,9 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
                     type="button"
                     disabled={busy}
                     className="item-delete-btn"
-                    aria-label={`${line.StokAdi}${line.PorsiyonAdi?` ${line.PorsiyonAdi}`:''} satırını sil`}
+                    aria-label={`${line.StokAdi}${line.PorsiyonAdi?` ${line.PorsiyonAdi}`:''} için iptal veya zayi kaydet`}
                     onClick={()=>setCancel(line)}
-                    title="Ürünü İptal Et / Sil"
+                    title="İptal veya zayi kaydet"
                   >
                     <Trash2 size={14}/>
                   </button>
@@ -313,13 +315,15 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
       )}
 
       {cancel&&(
-        <Modal title="Ürünü adisyondan kaldır" onClose={()=>{if(!busy)setCancel(null);}}>
-          <p><strong>{cancel.StokAdi}</strong> ({cancel.Miktar} adet) adisyondan kaldırılacak.</p>
+        <Modal title="Ürünü adisyondan çıkar" onClose={()=>{if(!busy)setCancel(null);}}>
+          <p><strong>{cancel.StokAdi}</strong> ({cancel.Miktar} adet) için işlem türünü ve gerekçeyi kaydedin.</p>
+          <div className="op-removal-types" role="group" aria-label="Çıkarma türü"><button type="button" aria-pressed={removalType===0} onClick={()=>setRemovalType(0)}>İptal</button>{admin&&<button type="button" aria-pressed={removalType===1} onClick={()=>setRemovalType(1)}>Zayi</button>}</div>
+          <label className="field">Gerekçe<input value={removalReason} maxLength={200} onChange={e=>setRemovalReason(e.target.value)} placeholder="Örn. müşteri vazgeçti"/></label>
           <ErrorBox error={mutation.error}/>
           <div className="dialog-actions">
             <button disabled={busy} onClick={()=>setCancel(null)}>Vazgeç</button>
-            <button className="danger" disabled={busy} onClick={()=>mutation.mutate({path:`/siparisler/${cancel.KayitNo}`,method:'DELETE'},{onSuccess:()=>setCancel(null)})}>
-              Ürünü kaldır
+            <button className="danger" disabled={busy||!removalReason.trim()} onClick={()=>mutation.mutate({path:`/siparisler/${cancel.KayitNo}/cikar`,method:'POST',body:{Tip:removalType,Gerekce:removalReason.trim()}},{onSuccess:()=>{setCancel(null);setRemovalReason('');setRemovalType(0);}})}>
+              {removalType===1?'Zayi kaydet':'İptal et'}
             </button>
           </div>
         </Modal>
