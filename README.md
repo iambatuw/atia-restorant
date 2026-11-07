@@ -1,118 +1,122 @@
-> ### 📌 Batuhan'dan Not
+> ### Batuhan'dan Not
+>
 > Test için böyle bir şey denedim veritabanı vs zaten olmadığı için öylesine denemelik birşeyler yaptırdım 6.11.2026 // 22.08
 > PlatinMarket, Entegra, POS gibi canlı bağlantılar için veritabanı şeması ile ilgili sağlayıcı erişimleri gerekiyor.
 
----
+# ATIA Restoran Web
 
-# Atia Restoran Web Yönetim ve Operasyon Sistemi
+ATIA'nın masaüstü restoran uygulamasını web ortamına taşıyoruz. Bu depoda personel ekranları, API ve tarayıcıda açılan müşteri menüsü birlikte duruyor. Şu anki sürüm, restoran akışlarını **demo verisiyle** denemek için çalışıyor; gerçek mağaza veritabanına bağlı değil.
 
-Eski, hantal ve kararsız Windows masaüstü (.NET Framework 4.5.2 / DevExpress WinForms / LINQ-to-SQL) restoran otomasyonunu modern, hızlı, yüksek performanslı ve güvenilir bir web mimarisine dönüştüren yeni nesil restoran yönetim platformu.
+Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük rapor ve rezervasyon var. Giriş ekranı korunarak diğer personel ekranları yeniden düzenlendi. Masaüstünden hangi özelliklerin taşınmaya değer olduğunu ve hangi bağlantıların beklediğini [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) anlattık.
 
-Sistem; sunucu otoritesinde çalışan **ASP.NET Core 10 LTS Minimal API**, anlık veri akışı sağlayan **SignalR Hub** ve modern **React 19 / TypeScript / Vite** arayüzü üzerine inşa edilmiştir.
+## Bugün neler çalışıyor?
 
----
+| Alan | Demo ortamında yapabilecekleriniz | Sınır |
+| --- | --- | --- |
+| Masalar ve adisyon | Bölüm veya duruma göre masa bulma; ürün, porsiyon ve sipariş notu ekleme; adet değiştirme; ödeme alma; masa taşıma, ayırma ve birleştirme | İşlemler bellekte tutulur. Sunucu yeniden başlayınca sıfırlanır. |
+| Mutfak | Açık adisyonlardan gelen ürünleri ve notları görme, fişi hazır işaretleme | Gerçek mutfak yazıcısı bağlı değildir. |
+| Paket servis | Müşteri, telefon, adres, ürün ve ödeme şekliyle sipariş açma; kurye atayıp siparişi hazırlama, yola çıkarma ve teslim etme | Manuel demo akışıdır. Çevrim içi sipariş sağlayıcılarından otomatik kayıt almaz. |
+| Günlük rapor | Kapanan adisyonların tahsilatını, ödeme türlerini, saatlik tutarları ve çok satan ürünleri görme | Paket servis kayıtları henüz bu rapora katılmaz. |
+| Rezervasyon | Tarihe göre kayıt görme, yeni rezervasyon açma ve iptal etme | Az kullanılan bir akış olduğu için ikincil menüdedir. |
+| Menü | Personelin ürünleri araması; müşterinin `/menu` adresinden ürün ve fiyatları görmesi | Müşteri menüsü sipariş göndermez; ürün düzenleme ekranı henüz yoktur. |
+| POS | Adisyon ödemesinde manuel POS veya Hugin S1/PayGo için örnek işlem ve sonuç sorgulama | Fiziksel terminale bağlanmaz. Onay adımı simülasyondur. |
 
-## 🌟 Öne Çıkan Özellikler ve Mimari Yenilikler
+### Masadan ödemeye
 
-### 1. Modern ve Güvenilir Teknoloji Yığını
-- **Backend:** C# / .NET 10 LTS Minimal API (Yüksek performans, düşük bellek tüketimi).
-- **Frontend:** React 19, TypeScript 5.9, Vite 7, TanStack React Query v5, Lucide Icons.
-- **Gerçek Zamanlı İletişim:** SignalR (`/hubs/restorant`) ile masalar, siparişler ve mutfak ekranı arasında anlık soket senkronizasyonu.
-- **Finansal Güvenlik (Server-Authoritative):** İstemci tarafı fiyat, iskonto ve toplam hesaplayamaz; tüm hesaplamalar kuruş hassasiyetinde (`decimal`, 2 hane) sunucuda kesinleştirilir.
+Garson veya yönetici masayı seçip menüden ürün ekleyebilir. Porsiyon ve sipariş notu satırla birlikte kaydedilir. Yönetici gerektiğinde ürün ikramını işaretler, adisyonu başka masaya taşır, ayırır veya birleştirir.
 
-### 2. Eski Sistemdeki Kritik Mantık Hatalarının Giderilmesi
-Eski masaüstü kod tabanında tespit edilen ve işletme operasyonunu bozan kök hatalar tamamen çözülmüştür:
-- **Masa Birleştirme Hatası (`RestorantService.cs:1006-1009`):** Eski kodda `NakitToplam` alanı sırasıyla Banka, Cari ve İndirim toplamları tarafından 4 kez üst üste eziliyordu. Yeni mimaride her ödeme kalemi ve sipariş satırı ana adisyona matematiksel doğrulukla konsolide edilir.
-- **Masa Ayırma Mantık Hatası (`frmMasaAyirma.cs:60`):** Açık adisyon satırlarının durumunu bozan mutasyon hatası giderilmiş; seçilen ürün ve adetler hedef masaya güvenli şekilde aktarılırken her iki adisyon otomatik güncellenir.
-- **Masa Taşıma Güvenliği:** Bir masanın adisyonu yalnızca boş ve rezerve olmayan hedef masalara aktarılabilir, mükerrer adisyon açılması engellenir.
+Ödeme ekranı nakit, banka kartı, yemek kartı, cari ve indirim tutarlarını ayrı alır. Kısmi ödeme yapılırsa kalan tutar adisyonda görünür; tutar tamamlandığında adisyon kapanır. Sunucu ürün fiyatını ve ödeme toplamını denetler. Hugin S1 ve PayGo seçimi, gerçek cihazla konuşan bir bağlantı değil, işlem durumlarını denemek için hazırlanmış simülasyondur.
 
-### 3. POS Terminal Entegrasyonu ve Kısmi Ödeme (Hugin S1 & PayGo)
-- **Dayanıklı Durum Makinesi:** 
-  `Başlatıldı (0)` ➔ `Cihaza Gönderildi (1)` ➔ `Onaylandı (2)` / `Reddedildi (3)` / `Belirsiz (4)` ➔ `ERP Kaydedildi (5)` ➔ `Mutabık (6)`
-- **Mükerrer Çekim Koruması (Idempotency):** Ağ kopması veya terminal gecikmelerinde çift tahsilatı engelleyen tekil işlem anahtarı (`IdempotencyKey`) desteği.
-- **PCI-DSS Uyumu:** Kart numarası (PAN), PIN veya CVV sunucuya uğramaz ve kaydedilmez; yalnızca maskeli kart bilgisi (`************4582`), RRN ve banka provizyon kodları saklanır.
-- **Parçalı / Kısmi Ödeme:** Bir adisyon birden fazla kişi arasında nakit, kredi kartı ve yemek kartı şeklinde parçalı olarak ödenebilir; adisyon yalnızca kalan bakiye 0 TL olduğunda kapanır.
+### Paket siparişinin yolu
 
-### 4. Kullanıcı Rolleri ve Özel Ekranlar
+Yeni siparişte müşteri ve teslimat bilgileriyle ürünleri girersiniz. Sipariş **Yeni → Hazırlanıyor → Yolda → Teslim edildi** sırasıyla ilerler. Yola çıkarırken kurye adı gerekir. Ürün fiyatları sunucudaki menüden alınır; tekrar gönderilen isteğin ikinci bir sipariş açmaması için işlem anahtarı kullanılır. Bu akış henüz gerçek müşteri ve sipariş tablolarına bağlı değildir.
 
-| Rol | Ekran & Deneyim | Yetkiler |
-|---|---|---|
-| **Yönetici (Admin)** | Kapsamlı Yönetim Paneli | Masa planı, sipariş, parçalı ödeme alma, Hugin/PayGo POS, masa taşı/ayır/birleştir, gün sonu ciro ve saatlik satış raporları |
-| **Garson** | Tablet & Mobil Ergonomik Panel | Salon bazlı masa seçimi, dokunmatik hızlı sipariş, porsiyon/not ekleme, satır silme/iptal |
-| **Mutfak** | Canlı Mutfak Ekranı (KDS) | SignalR ile anlık düşen sipariş fişleri, bekleme süresi sayacı ve sipariş hazır işaretleme |
-| **Müşteri** | QR Dijital Menü (`/menu`) | Hafif, hızlı açılan, personel kontrollerinden arındırılmış şık kategori ve ürün kataloğu |
+### Kim hangi ekrana girer?
 
-### 5. UI/UX Tasarım Standartları
-- **Yapay Zeka ve Şablon Klişelerinden Uzak:** Tekrarlayan pazarlama sloganları ve yapay kart gölgeleri yerine doğrudan restoran operasyonuna odaklanan net ve işlevsel arayüz.
-- **Aydınlık ve Karanlık Tema (Light / Dark Mode):** Anlamsal CSS değişkenleriyle sistem tercihini otomatik algılayan ve manuel geçiş sunan tasarım.
-- **Dokunmatik Ergonomi:** Tablet ve telefonlar için minimum **44×44 CSS px** dokunma hedefleri.
-- **Erişilebilirlik:** **WCAG 2.2 AA (≥ 4.5:1)** kontrast uyumu ve finansal rakamlar için `tabular-nums` kullanımı.
+| Rol | Erişim |
+| --- | --- |
+| Yönetici (`admin`) | Genel bakış, masalar, paket servis, mutfak, menü, günlük rapor, entegrasyon durumu ve rezervasyonlar. Ödeme ve masa taşıma gibi yönetici işlemleri bu roldedir. |
+| Garson (`garson`) | Masalar, sipariş ve paket servis akışı, menü. |
+| Mutfak (`mutfak`) | Mutfak fişleri ve menü. |
+| Müşteri | Giriş yapmadan `/menu` adresindeki salt okunur menü. |
 
----
+Personel ekranları telefonda ve masaüstünde açılır. Açık ve koyu tema bulunur. Sunucu, değişikliklerden sonra SignalR üzerinden personel ekranlarına yenileme sinyali gönderir.
 
-## 🚀 Kurulum ve Tek Komutla Çalıştırma (Tek Proje Mimarisi)
+## Yerelde çalıştırma
 
-Sistem artık **tek bir birleşik ASP.NET Core projesi** olarak yapılandırılmıştır. Backend ve derlenmiş React Single Page Application (SPA) arayüzü aynı web sunucusunda (`wwwroot`) barındırılır. Tek bir komutla hem API hem de web arayüzü yayına alınır.
+Gerekenler: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). Depodaki derlenmiş arayüz `wwwroot` altında bulunduğu için yalnızca uygulamayı açacaksanız Node.js gerekmez.
 
-### Gereksinimler
-- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (veya üzeri)
-- *(İsteğe bağlı - Sadece arayüz geliştirme için)* [Node.js](https://nodejs.org/) v20+
+Depo kökünde:
 
-### Tek Adımda Başlatma (Tavsiye Edilen)
-Proje kök dizininde tek bir komut çalıştırmanız yeterlidir:
-
-```bash
-dotnet run --urls "http://127.0.0.1:5080" --environment Development
+```powershell
+dotnet run --environment Development --urls "http://127.0.0.1:5080"
 ```
-*Uygulama `http://127.0.0.1:5080` adresinde açılır. Hem web arayüzü, hem `/api/...` uç noktaları hem de SignalR soket bağlantısı tek port üzerinden kesintisiz çalışır.*
 
-### Arayüz Geliştirme Modu (Vite Hot-Reload)
-React bileşenlerinde anlık değişiklik yapmak istediğinizde:
+Personel girişi için `http://127.0.0.1:5080/login`, müşteri menüsü için `http://127.0.0.1:5080/menu` adresini açın. API de aynı sunucuda `/api` altında çalışır.
 
-```bash
+### Demo hesapları
+
+Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir:
+
+| Rol | Kullanıcı adı | Şifre |
+| --- | --- | --- |
+| Yönetici | `admin` | `demo123` |
+| Garson | `garson` | `demo123` |
+| Mutfak | `mutfak` | `demo123` |
+
+Demo siparişleri, rezervasyonları ve ödemeleri kalıcı değildir. Sunucuyu yeniden başlattığınızda başlangıç verisine dönersiniz. Bu hesapları gerçek işletme kurulumu için kullanmayın.
+
+### Arayüz üzerinde çalışmak
+
+[Node.js](https://nodejs.org/) 20 veya üzeri ile iki terminal kullanın. İlk terminalde yukarıdaki .NET komutu açık kalsın. İkinci terminalde:
+
+```powershell
 cd ClientApp
-npm install
+npm ci
 npm run dev
 ```
-*Vite geliştirme sunucusu `http://127.0.0.1:5173` adresinde açılır ve istekleri otomatik olarak 5080 portundaki backend servisine yönlendirir.*
 
----
+Vite arayüzü `http://127.0.0.1:5173` adresinde açar ve API ile SignalR isteklerini 5080 portuna iletir. Arayüz değişikliklerini .NET sunucusunun sunduğu sürüme aktarmak için `ClientApp` içinde `npm run build` çalıştırın; çıktı `wwwroot` klasörüne yazılır.
 
-## 🔑 Hazır Demo Kullanıcı Hesapları
+## Kodun düzeni
 
-Uygulama demo ve geliştirme modunda aşağıdaki hesaplarla test edilebilir:
+- `Program.cs`: API rotaları, rol kuralları, oturum açma, SignalR ve statik dosyalar.
+- `Data/RestaurantRepository.cs`: Demo veri ve masa, ödeme, mutfak, paket servis iş kuralları.
+- `Models/`: API istekleri ve veri modelleri.
+- `ClientApp/src/`: React ekranları, oturum yönetimi ve arayüz stilleri.
+- `Tests/`: API sözleşmesi ve iş kuralı testleri.
+- `wwwroot/`: Derlenmiş arayüz; .NET uygulaması bu dosyaları sunar.
 
-| Rol | Kullanıcı Adı | Şifre |
-|---|---|---|
-| **Yönetici** | `admin` | `demo123` |
-| **Garson** | `garson` | `demo123` |
-| **Mutfak** | `mutfak` | `demo123` |
+Sunucu ASP.NET Core 10, arayüz React 19, TypeScript ve Vite ile yazıldı. TanStack Query veri isteklerini, SignalR değişiklik bildirimlerini yönetir. Personel oturumu JWT kullanır. Demo verileri bellekte tutulur; `Data/DbContext.cs` içindeki SQL sınırı doğrulanmış bir canlı bağlantı değildir.
 
-*Müşteri QR menüsüne erişmek için giriş ekranının altındaki **"Müşteri menüsünü aç"** bağlantısına tıklayabilir veya doğrudan `http://127.0.0.1:5080/menu` adresine gidebilirsiniz.*
+## Testler
 
----
+Depo kökünde API testleri:
 
-## 🧪 Test ve Doğrulama
-
-Sistem hem backend hem de frontend tarafında kapsamlı testlerle korunmaktadır:
-
-```bash
-# Backend Testleri (19 Test - xUnit)
+```powershell
 dotnet test Tests/AtiaRestorant.API.Tests.csproj
+```
 
-# Frontend Testleri (12 Test - Vitest)
+`ClientApp` içinde arayüz testleri ve üretim derlemesi:
+
+```powershell
 cd ClientApp
+npm ci
 npm test
-
-# Frontend Üretim Derlemesi (wwwroot çıktısı)
-cd ClientApp
 npm run build
 ```
 
----
+7 Kasım 2026 kontrolünde 25 API ve 16 arayüz testi geçti; üretim derlemesi de tamamlandı. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
 
-## 🔒 Güvenli SQL Server Köprüsü & Canlıya Geçiş
+## Canlı kullanımdan önce
 
-Uygulama, güvenli mimari prensibi gereği **Fail-Closed** çalışır:
-- Canlı Microsoft SQL Server şeması doğrulanmadıkça sistem veritabanına körü körüne sorgu atmaz; `Demo:Enabled=false` yapıldığında `HTTP 503 Service Unavailable` döner.
-- Canlı ERP ortamına bağlanırken gerçek tablo şemaları, transaction izolasyon seviyeleri ve yetki kısıtları doğrulanarak güvenli bir geçiş sağlanacaktır.
+`Demo:Enabled=false` ayarı gerçek veritabanını açmaz. SQL şeması henüz doğrulanmadığı için API, sağlık kontrolü dışındaki isteklerde 503 yanıtı verir. Demo modu da geliştirme ortamı dışında başlatılmaz. Bu sürümü mağazada canlı tahsilat veya sipariş kaydı için kullanmayın.
+
+Geçiş için şu bilgilere ihtiyaç var:
+
+1. Masa, adisyon, sipariş satırı, ödeme, ürün, müşteri, paket servis ve mağaza ayarlarının gerçek veritabanı şeması; mümkünse kişisel verisi ayıklanmış örnek kayıtlar.
+2. Hangi mağazanın PlatinMarket, Entegra, Hugin/PayGo, e-Adisyon veya arayan numara donanımını kullandığı.
+3. Kullanılan sağlayıcıların güncel API belgeleri ve test erişimleri. Erişim bilgileri depoya yazılmamalı.
+4. Masaüstü uygulamasıyla web aynı veriyi kullanacaksa eşzamanlı işlem, mükerrer sipariş ve mükerrer tahsilat kuralları.
+
+Önce canlı veri eşlemesi ve mağaza bazlı yetki sınırları kurulmalı. Ardından paket servis ve gerçekten kullanılan sipariş kaynakları bağlanabilir. Fiziksel POS, yazıcı ve arayan numara donanımı ayrı bağlantı çalışmaları gerektirir. Ayrıntılı sıra ve masaüstü kodundaki karşılıklar [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) bulunuyor.
