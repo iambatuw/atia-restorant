@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -97,17 +96,6 @@ app.UseStatusCodePages(async statusContext =>
     await Results.Problem(statusCode: response.StatusCode, title: response.StatusCode switch
     { 401 => "Oturum açmanız gerekiyor.", 403 => "Bu işlem için yetkiniz yok.", 404 => "Kaynak bulunamadı.",
         400 => "İstek geçersiz.", _ => "İstek tamamlanamadı." }).ExecuteAsync(statusContext.HttpContext);
-});
-app.Use(async (context, next) =>
-{
-    if (mode.IsDemo && (context.Connection.RemoteIpAddress is null ||
-        !IPAddress.IsLoopback(context.Connection.RemoteIpAddress)))
-    {
-        await Results.Problem(statusCode: 403, title: "Demo yalnızca bu bilgisayardan kullanılabilir.")
-            .ExecuteAsync(context);
-        return;
-    }
-    await next(context);
 });
 app.UseDefaultFiles();
 app.UseStaticFiles();

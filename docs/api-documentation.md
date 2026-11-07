@@ -1,6 +1,6 @@
 # AtiaRestorant API
 
-ASP.NET Core **.NET 10 LTS** restaurant demonstration backend. No database SDK, credentials, verified ERP mappings, or ERP writes are included. SignalR uses the ASP.NET Core shared framework, not the obsolete 1.x package.
+ASP.NET Core **.NET 10 LTS** restaurant demonstration backend. No database SDK, provider credentials, verified ERP mappings, or ERP writes are included. SignalR uses the ASP.NET Core shared framework, not the obsolete 1.x package.
 
 ## Start and test
 
@@ -8,16 +8,16 @@ Install/use a .NET 10 SDK, then from this API directory:
 
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
-foreach ($role in 'Admin','Waiter','Kitchen') {
+foreach ($role in 'Waiter','Kitchen') {
     $password = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
     Set-Item -Path "Env:Demo__$($role)Password" -Value $password
     Write-Host "$role password: $password"
 }
 dotnet restore --source https://api.nuget.org/v3/index.json
-dotnet run --no-launch-profile --urls http://127.0.0.1:5000
+dotnet run --no-launch-profile --urls http://0.0.0.0:5000
 ```
 
-The frontend should target this origin. Development CORS allows `http://localhost:5173` with credentials for SignalR. No launch configuration is supplied. Without `Development`, the committed `Demo:Enabled=true` intentionally prevents startup. Demo requests are accepted only from the same computer. Development generates a cryptographically random, process-local JWT signing key if `JwtSettings__SecretKey` is absent; restarting invalidates old tokens.
+Open the app from another computer at `http://<server-LAN-IP>:5000/login`; allow the port through the host firewall if needed. Development CORS allows `http://localhost:5173` with credentials for SignalR. No launch configuration is supplied. Without `Development`, the committed `Demo:Enabled=true` intentionally prevents startup. Development generates a cryptographically random, process-local JWT signing key if `JwtSettings__SecretKey` is absent; restarting invalidates old tokens.
 
 ```powershell
 dotnet restore Tests/AtiaRestorant.API.Tests.csproj --source https://api.nuget.org/v3/index.json
@@ -28,17 +28,17 @@ Tests cover parallel orders and payments, snapshot isolation, authoritative pric
 
 ### Demo accounts (Development only)
 
-| KullaniciAdi | Password variable | Rol |
+| KullaniciAdi | Password | Rol |
 | --- | --- | --- |
-| admin | `Demo__AdminPassword` | Admin |
+| admin | `demo123` | Admin |
 | garson | `Demo__WaiterPassword` | Garson |
 | mutfak | `Demo__KitchenPassword` | Mutfak |
 
-These demo usernames are fixed, but each role requires a different password of 12–128 characters supplied at startup. The command above creates and prints random values; use the matching value for login. Missing, short or duplicate values prevent startup. The passwords are not committed. Login is limited to 10 attempts per minute per direct remote IP, with HTTP 429 thereafter. Do not enable untrusted forwarded headers; configure trusted proxy handling separately if needed.
+The demo admin password is fixed at `demo123`. Waiter and kitchen need distinct 12–128 character passwords supplied at startup; neither may equal the admin password. The command above creates and prints random values for them. Missing, short or duplicate values prevent startup. Login is limited to 10 attempts per minute per direct remote IP, with HTTP 429 thereafter. Anyone who can reach this demo and knows the published admin password can sign in as Admin; limit network access and do not use real business data. Do not enable untrusted forwarded headers; configure trusted proxy handling separately if needed.
 
 ### Non-demo / production
 
-Set `Demo__Enabled=false` and provide `JwtSettings__SecretKey` via an environment variable or secret store (at least **32 UTF-8 bytes**, cryptographically random), plus issuer/audience as appropriate. Demo is rejected in any environment other than Development; a production signing key is mandatory. No secrets are committed. HTTPS redirection is enabled outside Development; terminate TLS securely and configure trusted proxy forwarding when applicable. Hostnames beyond localhost/127.0.0.1 require an explicit `AllowedHosts` override.
+Set `Demo__Enabled=false` and provide `JwtSettings__SecretKey` via an environment variable or secret store (at least **32 UTF-8 bytes**, cryptographically random), plus issuer/audience as appropriate. Demo is rejected in any environment other than Development; a production signing key is mandatory. No production secrets are committed. HTTPS redirection is enabled outside Development; terminate TLS securely and configure trusted proxy forwarding when applicable. Configure `AllowedHosts` for the intended production hostnames before deployment.
 
 **SQL mode is intentionally unavailable.** Anonymous `GET /api/health` returns Mode `SqlServer`, DatabaseReady `false`; all other requests return **503 ProblemDetails**, including login, menu, authenticated routes and the hub. `Data/DbContext.cs` is explicitly inactive/unverified and is not registered in DI. The former speculative SQL adapter was removed, including its incorrect use of printed quantities as kitchen readiness. Re-enabling ERP requires schema inspection, verified read mappings, authentication/authorization integration, monetary and receipt lifecycle rules, transactional concurrency controls, a dedicated kitchen readiness store, and integration tests. A connection string alone cannot enable it.
 
@@ -82,7 +82,7 @@ Empty-table adisyon returns `Data: null`. Failed requests return non-2xx RFC Pro
 | POST | `/api/rezervasyonlar` | Admin; `RezervasyonEkleRequest` -> `RezervasyonDTO` |
 | DELETE | `/api/rezervasyonlar/{id}` | Admin; removed `RezervasyonDTO` |
 
-Login body is `{ "KullaniciAdi":"garson", "Sifre":"<Demo__WaiterPassword value>" }`. Its Data is `{Token,KullaniciAdi,Rol,KullaniciId,TamAd}`; send the token in `Authorization: Bearer ...`. Tokens expire after eight hours. Only Garson/Mutfak/Admin are valid staff roles. The server derives the role from its signed token; a client-supplied role field cannot grant permission.
+Admin login body is `{ "KullaniciAdi":"admin", "Sifre":"demo123" }`. Its Data is `{Token,KullaniciAdi,Rol,KullaniciId,TamAd}`; send the token in `Authorization: Bearer ...`. Tokens expire after eight hours. Only Garson/Mutfak/Admin are valid staff roles. The server derives the role from its signed token; a client-supplied role field cannot grant permission.
 
 ### Mutation rules
 

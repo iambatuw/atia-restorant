@@ -26,14 +26,16 @@ public sealed record JwtConfiguration(string Key, string Issuer, string Audience
 
 public sealed record DemoCredentials(byte[] Admin, byte[] Waiter, byte[] Kitchen)
 {
+    private const string AdminPassword = "demo123";
+
     public static DemoCredentials Load(IConfiguration configuration, BackendMode mode)
     {
         if (!mode.IsDemo) return new([], [], []);
-        var passwords = new[] { configuration["Demo:AdminPassword"],
+        var passwords = new[] { AdminPassword,
             configuration["Demo:WaiterPassword"], configuration["Demo:KitchenPassword"] };
-        if (passwords.Any(p => string.IsNullOrWhiteSpace(p) || p.Length < 12 || p.Length > 128) ||
+        if (passwords.Skip(1).Any(p => string.IsNullOrWhiteSpace(p) || p.Length < 12 || p.Length > 128) ||
             passwords.Distinct(StringComparer.Ordinal).Count() != passwords.Length)
-            throw new InvalidOperationException("Set three distinct Demo password environment variables (12-128 characters).");
+            throw new InvalidOperationException("Set distinct Demo waiter and kitchen passwords (12-128 characters), different from the admin demo password.");
         return new(SHA256.HashData(Encoding.UTF8.GetBytes(passwords[0]!)),
             SHA256.HashData(Encoding.UTF8.GetBytes(passwords[1]!)),
             SHA256.HashData(Encoding.UTF8.GetBytes(passwords[2]!)));

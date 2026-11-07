@@ -24,13 +24,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public ApiFactory(IPAddress? remoteAddress = null) => _remoteAddress = remoteAddress ?? IPAddress.Loopback;
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        var keys = new[] { "Demo__AdminPassword", "Demo__WaiterPassword", "Demo__KitchenPassword" };
+        var keys = new[] { "Demo__WaiterPassword", "Demo__KitchenPassword" };
         var previous = keys.Select(Environment.GetEnvironmentVariable).ToArray();
         try
         {
-            Environment.SetEnvironmentVariable(keys[0], "admin-test-password-12");
-            Environment.SetEnvironmentVariable(keys[1], "waiter-test-password-12");
-            Environment.SetEnvironmentVariable(keys[2], "kitchen-test-password-12");
+            Environment.SetEnvironmentVariable(keys[0], "waiter-test-password-12");
+            Environment.SetEnvironmentVariable(keys[1], "kitchen-test-password-12");
             return base.CreateHost(builder);
         }
         finally
@@ -45,7 +44,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Demo:Enabled"] = "true", ["JwtSettings:SecretKey"] = "test-only-generated-config-key-32-bytes-minimum",
-            ["Demo:AdminPassword"] = "admin-test-password-12", ["Demo:WaiterPassword"] = "waiter-test-password-12",
+            ["Demo:WaiterPassword"] = "waiter-test-password-12",
             ["Demo:KitchenPassword"] = "kitchen-test-password-12"
         }));
     }
@@ -69,7 +68,7 @@ public sealed class HttpContractTests
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = false };
     private static async Task Login(HttpClient client, string username)
     {
-        var password = username switch { "admin" => "admin-test-password-12", "garson" => "waiter-test-password-12",
+        var password = username switch { "admin" => "demo123", "garson" => "waiter-test-password-12",
             "mutfak" => "kitchen-test-password-12", _ => throw new ArgumentException("Unknown test account") };
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { KullaniciAdi = username, Sifre = password });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -116,13 +115,13 @@ public sealed class HttpContractTests
     }
 
     [Fact]
-    public async Task DemoRejectsNonLoopbackClientsBeforeLoginOrStaticFiles()
+    public async Task DemoServesRemoteClientsAndAdminCanLogin()
     {
         using var factory = new ApiFactory(IPAddress.Parse("10.20.30.40"));
         using var client = factory.CreateClient();
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/login")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/auth/login",
-            new LoginRequest { KullaniciAdi = "admin", Sifre = "admin-test-password-12" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/login")).StatusCode);
+        await Login(client, "admin");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/raporlar/gunluk")).StatusCode);
     }
 
     [Fact]
@@ -280,7 +279,7 @@ public sealed class HttpContractTests
         for (var i = 0; i < 10; i++)
             Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/auth/login",
                 new LoginRequest { KullaniciAdi = "admin", Sifre = "wrong" })).StatusCode);
-        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { KullaniciAdi = "admin", Sifre = "admin-test-password-12" });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { KullaniciAdi = "admin", Sifre = "demo123" });
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }

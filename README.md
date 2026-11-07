@@ -57,27 +57,27 @@ Gerekenler: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). De
 Depo kökünde:
 
 ```powershell
-foreach ($role in 'Admin','Waiter','Kitchen') {
+foreach ($role in 'Waiter','Kitchen') {
     $password = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
     Set-Item -Path "Env:Demo__$($role)Password" -Value $password
     Write-Host "$role parolası: $password"
 }
-dotnet run --environment Development --urls "http://127.0.0.1:5080"
+dotnet run --environment Development --urls "http://0.0.0.0:5080"
 ```
 
-Personel girişi için `http://127.0.0.1:5080/login`, müşteri menüsü için `http://127.0.0.1:5080/menu` adresini açın. API de aynı sunucuda `/api` altında çalışır.
+Sunucu bilgisayarında personel girişi için `http://127.0.0.1:5080/login` adresini açın. Diğer bilgisayarlarda `127.0.0.1` yerine sunucunun yerel ağ IP adresini yazın: `http://SUNUCU-IP:5080/login`. Müşteri menüsü aynı adreste `/menu`, API ise `/api` altında çalışır. Windows Güvenlik Duvarı bağlantıyı engelliyorsa 5080 portuna izin verin.
 
 ### Demo hesapları
 
-Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir. Üç farklı parola yukarıdaki komutta üretilir; çıktıdaki parolaları ilgili hesapla kullanın. Parolalar depoda tutulmaz.
+Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir. Yönetici parolası `demo123` olarak sabittir. Garson ve mutfak parolaları yukarıdaki komutta üretilir; çıktıdaki değerleri ilgili hesapla kullanın.
 
-| Rol | Kullanıcı adı | Parola değişkeni |
+| Rol | Kullanıcı adı | Parola |
 | --- | --- | --- |
-| Yönetici | `admin` | `Demo__AdminPassword` |
+| Yönetici | `admin` | `demo123` |
 | Garson | `garson` | `Demo__WaiterPassword` |
 | Mutfak | `mutfak` | `Demo__KitchenPassword` |
 
-Demo yalnızca aynı bilgisayardan erişilen istekleri kabul eder. İmzalı oturum belirtecindeki rol sunucuda doğrulanır; istek gövdesindeki rol veya personel alanı yetki vermez. Demo siparişleri, rezervasyonları ve ödemeleri kalıcı değildir. Sunucuyu yeniden başlattığınızda başlangıç verisine dönersiniz. Bu hesapları gerçek işletme kurulumu için kullanmayın.
+Demo sunucuya erişebilen diğer bilgisayarlardan da açılır. `admin/demo123` bilgileri bu depoda açıkça yer aldığı için erişimi ağ düzeyinde kısıtlamadan gerçek işletme verisiyle kullanmayın. İmzalı oturum belirtecindeki rol sunucuda doğrulanır; istek gövdesindeki rol veya personel alanı yetki vermez. Demo siparişleri, rezervasyonları ve ödemeleri kalıcı değildir. Sunucuyu yeniden başlattığınızda başlangıç verisine dönersiniz.
 
 ### Arayüz üzerinde çalışmak
 
