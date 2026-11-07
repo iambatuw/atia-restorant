@@ -33,6 +33,3 @@ coverage/
 Thumbs.db
 [Dd]esktop.ini
 .DS_Store
-
-# Claude Code
-.claude/
