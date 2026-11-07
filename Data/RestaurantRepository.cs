@@ -87,14 +87,14 @@ public sealed class RestaurantRepository
     }
     private static void Staff(StaffActor actor, params string[] roles) =>
         Require(actor.Id > 0 && roles.Contains(actor.Role), "Bu işlem için yetkiniz yok.", 403);
-    private static void Permission(StaffActor actor, string action)
+    private enum StaffOperation { Order, Cancel, Waste, Gift, Payment, Kitchen }
+    private static void Permission(StaffActor actor, StaffOperation action)
     {
         var allowed = action switch
         {
-            "order" => actor.Role is "Admin" or "Garson",
-            "cancel" => actor.Role is "Admin" or "Garson",
-            "waste" or "gift" or "payment" => actor.Role == "Admin",
-            "kitchen" => actor.Role is "Admin" or "Mutfak",
+            StaffOperation.Order or StaffOperation.Cancel => actor.Role is "Admin" or "Garson",
+            StaffOperation.Waste or StaffOperation.Gift or StaffOperation.Payment => actor.Role == "Admin",
+            StaffOperation.Kitchen => actor.Role is "Admin" or "Mutfak",
             _ => false
         };
         Require(actor.Id > 0 && allowed, "Bu işlem için yetkiniz yok.", 403);
@@ -235,9 +235,9 @@ public sealed class RestaurantRepository
 
     public AdisyonBaslikDTO AddOrder(SiparisEkleRequest request, StaffActor actor) => Change(() =>
     {
-        Permission(actor, "order");
+        Permission(actor, StaffOperation.Order);
         Quantity(request.Miktar); Note(request.SatirAciklama);
-        if (request.Ikram) Permission(actor, "gift");
+        if (request.Ikram) Permission(actor, StaffOperation.Gift);
         Require(!request.StokEkstra && string.IsNullOrWhiteSpace(request.StokEkstraAdi), "Serbest fiyatlı/ekstra ürünler desteklenmiyor.");
         var table = Table(request.MasaKayitNo);
         Require(!table.BirlesmisMasa && !table.AnaMasa, "Birleşmiş masa desteklenmiyor.", 409);
@@ -269,11 +269,11 @@ public sealed class RestaurantRepository
 
     public AdisyonBaslikDTO UpdateOrder(long id, SiparisGuncelleRequest request, StaffActor actor) => Change(() =>
     {
-        Permission(actor, "order");
+        Permission(actor, StaffOperation.Order);
         Require(request.DetayKayitNo == 0 || request.DetayKayitNo == id, "URL ve sipariş kimliği uyuşmuyor.");
         Quantity(request.Miktar); Note(request.SatirAciklama);
         var (receipt, line) = Line(id);
-        if (request.Ikram != line.Ikram || (line.Ikram && request.Miktar > line.Miktar)) Permission(actor, "gift");
+        if (request.Ikram != line.Ikram || (line.Ikram && request.Miktar > line.Miktar)) Permission(actor, StaffOperation.Gift);
         var paid = (receipt.NakitToplam ?? 0) + (receipt.BankaToplam ?? 0) + (receipt.CariToplam ?? 0) + (receipt.YemekKartiToplam ?? 0) + (receipt.IndirimToplam ?? 0);
         var newLineTotal = request.Ikram ? 0 : decimal.Round(request.Miktar * line.BirimFiyat, 2, MidpointRounding.AwayFromZero);
         Require(receipt.GenelToplam - line.SatirTutari + newLineTotal >= paid, "Sipariş toplamı alınmış ödemeden düşük olamaz.", 409);
@@ -302,7 +302,7 @@ public sealed class RestaurantRepository
     public AdisyonBaslikDTO RemoveOrder(long id, SiparisCikarmaRequest request, StaffActor actor) => Change(() =>
     {
         Require(Enum.IsDefined(request.Tip), "İşlem türü geçersiz.");
-        Permission(actor, request.Tip == SiparisCikarmaTipi.Zayi ? "waste" : "cancel");
+        Permission(actor, request.Tip == SiparisCikarmaTipi.Zayi ? StaffOperation.Waste : StaffOperation.Cancel);
         Require(!string.IsNullOrWhiteSpace(request.Gerekce) && request.Gerekce.Trim().Length is <= 200,
             "Gerekçe 1–200 karakter olmalı.");
         var (receipt, line) = Line(id);
@@ -323,7 +323,7 @@ public sealed class RestaurantRepository
 
     public AdisyonBaslikDTO Pay(long tableId, OdemeRequest request, StaffActor actor) => Change(() =>
     {
-        Permission(actor, "payment"); Table(tableId);
+        Permission(actor, StaffOperation.Payment); Table(tableId);
         var receipt = Open(tableId) ?? throw new ApiException(409, "Masada açık adisyon yok; ödeme yinelenmiş olabilir.");
         Require(receipt.KayitNo == request.BaslikKayitNo, "Adisyon değişti; güncel adisyonu yükleyin.", 409);
         decimal[] values = [request.NakitTutar, request.BankaTutar, request.CariTutar, request.YemekKartiTutar, request.IndirimTutar];
@@ -622,13 +622,13 @@ public sealed class RestaurantRepository
 
     public List<MutfakBildirimDTO> KitchenEvents(StaffActor actor) => Read(() =>
     {
-        Permission(actor, "kitchen");
+        Permission(actor, StaffOperation.Kitchen);
         return _kitchenEvents.Where(item => !item.Goruldu).OrderBy(item => item.KayitNo).ToList();
     });
 
     public MutfakBildirimDTO AcknowledgeKitchenEvent(long id, StaffActor actor) => Change(() =>
     {
-        Permission(actor, "kitchen");
+        Permission(actor, StaffOperation.Kitchen);
         var item = _kitchenEvents.FirstOrDefault(e => e.KayitNo == id)
             ?? throw new ApiException(404, "Mutfak bildirimi bulunamadı.");
         Require(!item.Goruldu, "Bildirim zaten görüldü.", 409);
@@ -638,7 +638,7 @@ public sealed class RestaurantRepository
 
     public AdisyonBaslikDTO MarkLineReady(long id, StaffActor actor) => Change(() =>
     {
-        Permission(actor, "kitchen");
+        Permission(actor, StaffOperation.Kitchen);
         var (receipt, line) = Line(id);
         Require(_ready.GetValueOrDefault(id) < line.Miktar, "Ürün zaten hazır.", 409);
         _ready[id] = line.Miktar;
@@ -647,7 +647,7 @@ public sealed class RestaurantRepository
 
     public AdisyonBaslikDTO MarkReady(long receiptId, StaffActor actor) => Change(() =>
     {
-        Permission(actor, "kitchen");
+        Permission(actor, StaffOperation.Kitchen);
         var receipt = _receipts.FirstOrDefault(r => r.KayitNo == receiptId)
             ?? throw new ApiException(404, "Adisyon bulunamadı.");
         Require(!receipt.Kapali, "Kapalı adisyon hazırlanamaz.", 409);

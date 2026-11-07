@@ -8,11 +8,16 @@ Install/use a .NET 10 SDK, then from this API directory:
 
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
+foreach ($role in 'Admin','Waiter','Kitchen') {
+    $password = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+    Set-Item -Path "Env:Demo__$($role)Password" -Value $password
+    Write-Host "$role password: $password"
+}
 dotnet restore --source https://api.nuget.org/v3/index.json
-dotnet run --no-launch-profile --urls http://localhost:5000
+dotnet run --no-launch-profile --urls http://127.0.0.1:5000
 ```
 
-The frontend should target this origin. Development CORS allows **only http://localhost:5173** with credentials for SignalR. No launch configuration is supplied. Without `Development`, the committed `Demo:Enabled=true` intentionally prevents startup. Development generates a cryptographically random, process-local JWT signing key if `JwtSettings__SecretKey` is absent; restarting invalidates old tokens.
+The frontend should target this origin. Development CORS allows `http://localhost:5173` with credentials for SignalR. No launch configuration is supplied. Without `Development`, the committed `Demo:Enabled=true` intentionally prevents startup. Demo requests are accepted only from the same computer. Development generates a cryptographically random, process-local JWT signing key if `JwtSettings__SecretKey` is absent; restarting invalidates old tokens.
 
 ```powershell
 dotnet restore Tests/AtiaRestorant.API.Tests.csproj --source https://api.nuget.org/v3/index.json
@@ -23,13 +28,13 @@ Tests cover parallel orders and payments, snapshot isolation, authoritative pric
 
 ### Demo accounts (Development only)
 
-| KullaniciAdi | Sifre | Rol |
+| KullaniciAdi | Password variable | Rol |
 | --- | --- | --- |
-| admin | demo123 | Admin |
-| garson | demo123 | Garson |
-| mutfak | demo123 | Mutfak |
+| admin | `Demo__AdminPassword` | Admin |
+| garson | `Demo__WaiterPassword` | Garson |
+| mutfak | `Demo__KitchenPassword` | Mutfak |
 
-These are public development examples, not deployable accounts. Login is limited to 10 attempts per minute per direct remote IP, with HTTP 429 thereafter. Do not enable untrusted forwarded headers; configure trusted proxy handling separately if needed.
+These demo usernames are fixed, but each role requires a different password of 12–128 characters supplied at startup. The command above creates and prints random values; use the matching value for login. Missing, short or duplicate values prevent startup. The passwords are not committed. Login is limited to 10 attempts per minute per direct remote IP, with HTTP 429 thereafter. Do not enable untrusted forwarded headers; configure trusted proxy handling separately if needed.
 
 ### Non-demo / production
 
@@ -57,25 +62,35 @@ Empty-table adisyon returns `Data: null`. Failed requests return non-2xx RFC Pro
 | GET | `/api/masalar/{id}/adisyon` | Staff; `AdisyonBaslikDTO` or null |
 | POST | `/api/siparisler` | Garson/Admin; `SiparisEkleRequest` -> adisyon |
 | PATCH | `/api/siparisler/{id}` | Garson/Admin; `SiparisGuncelleRequest` -> adisyon |
-| DELETE | `/api/siparisler/{id}` | Garson/Admin; updated adisyon |
-| POST | `/api/masalar/{id}/odeme` | Admin; `OdemeRequest` -> closed adisyon |
+| POST | `/api/siparisler/{id}/cikar` | Garson/Admin for cancellation, Admin for waste; `SiparisCikarmaRequest` with reason -> updated adisyon |
+| POST | `/api/masalar/{id}/odeme` | Admin; `OdemeRequest` -> updated or closed adisyon |
 | POST | `/api/masalar/tasi` | Admin; `MasaTasiRequest` -> moved adisyon |
+| POST | `/api/masalar/ayir` | Admin; `MasaAyirRequest` -> source and target receipts |
+| POST | `/api/masalar/birlestir` | Admin; `MasaBirlestirRequest` -> merged adisyon |
+| GET | `/api/paket-siparisler` | Garson/Admin; delivery orders |
+| POST | `/api/paket-siparisler` | Garson/Admin; create delivery order |
+| PATCH | `/api/paket-siparisler/{id}/durum` | Garson/Admin; advance delivery status |
 | GET | `/api/mutfak` | Mutfak/Admin; `MutfakSiparisDTO[]` |
+| GET | `/api/mutfak/bildirimler` | Mutfak/Admin; pending kitchen notices |
+| POST | `/api/mutfak/bildirimler/{id}/goruldu` | Mutfak/Admin; acknowledge notice |
+| POST | `/api/mutfak/satirlar/{id}/hazir` | Mutfak/Admin; mark one order line ready |
 | POST | `/api/mutfak/{baslikId}/hazir` | Mutfak/Admin; adisyon |
 | GET | `/api/raporlar/gunluk?tarih=YYYY-MM-DD` | Admin; `GunlukRaporDTO` (Istanbul today by default) |
+| GET | `/api/raporlar/islemler?tarih=YYYY-MM-DD` | Admin; operation history |
+| POST | `/api/raporlar/vardiya-kapat` | Admin; close completed business day |
 | GET | `/api/rezervasyonlar?tarih=YYYY-MM-DD` | Admin; `RezervasyonDTO[]` (all dates if omitted) |
 | POST | `/api/rezervasyonlar` | Admin; `RezervasyonEkleRequest` -> `RezervasyonDTO` |
 | DELETE | `/api/rezervasyonlar/{id}` | Admin; removed `RezervasyonDTO` |
 
-Login body is `{ "KullaniciAdi":"garson", "Sifre":"demo123" }`. Its Data is `{Token,KullaniciAdi,Rol,KullaniciId,TamAd}`; send the token in `Authorization: Bearer ...`. Tokens expire after eight hours. Only Garson/Mutfak/Admin are valid staff roles.
+Login body is `{ "KullaniciAdi":"garson", "Sifre":"<Demo__WaiterPassword value>" }`. Its Data is `{Token,KullaniciAdi,Rol,KullaniciId,TamAd}`; send the token in `Authorization: Bearer ...`. Tokens expire after eight hours. Only Garson/Mutfak/Admin are valid staff roles. The server derives the role from its signed token; a client-supplied role field cannot grant permission.
 
 ### Mutation rules
 
 - Singleton process-local repository uses one lock for all reads, writes, identity generation and result snapshots; clients cannot mutate internal DTOs. Seed includes 12 tables in Salon/Bahçe, 11 menu products with portions, open orders and one closed receipt.
 - Server derives item/portion price from active menu and staff identity from validated JWT, ignoring supplied `BirimFiyat`, `PersonelKayitNo`, and payment personnel. Arbitrary extra items are rejected. Quantity must be positive, <=100, with <=3 decimal places; row money is rounded to two places away from zero. Notes <=500 characters.
-- Garson may add/update quantity/notes and delete open rows. Only Admin can set/change `Ikram`. PATCH body `DetayKayitNo`, if nonzero, must match URL ID. The client should preserve the row's current Ikram flag. Closed receipts cannot change.
-- Payment must match the current table's `BaslikKayitNo`, every amount must be nonnegative with <=2 decimal places, and cash + bank + account + meal card + discount must **exactly** equal the receipt gross total. No floating-point tolerance. Negative, mismatch, stale header, duplicate or concurrent repeated payments fail before mutation. An empty receipt remains open until explicitly closed by Admin (zero payment is allowed for a zero balance).
-- Transfers require an occupied source and an empty, unreserved target. Same-table, merged-parent and merged-child transfers fail; merging/splitting is not implemented.
+- Garson may add/update quantity/notes and cancel open rows with a reason. Waste and `Ikram` are Admin-only. PATCH body `DetayKayitNo`, if nonzero, must match URL ID. The client should preserve the row's current Ikram flag. Closed receipts cannot change.
+- Payment must match the current table's `BaslikKayitNo`; every amount must be nonnegative with <=2 decimal places. A partial payment must be positive and no greater than the remaining balance. A final payment must exactly equal that balance. The receipt closes once paid in full. Negative amounts, mismatched POS confirmations, stale headers, duplicate final payments and overpayments fail before mutation.
+- Transfers require an occupied source and an empty, unreserved target. Split and merge are supported with additional checks, including preventing a split after partial payment. These operations remain process-local demo transactions.
 - KDS `HazirMiktar` is stored independently from printing. `KalanMiktar=max(0,Miktar-HazirMiktar)` and `Hazir=KalanMiktar<=0`. A ticket appears whenever any row is unready; ticket contains all its rows. Mark-ready acknowledges only quantities present inside that locked operation. Later added/increased quantities return a ticket. Reducing clamps ready quantity to the reduced count, so subsequent increases cannot resurrect readiness. **No operation updates YazdirilanMiktar**; print-related legacy fields are informational only.
 - Report `ToplamAdisyon`, hourly totals and bestsellers include only closed receipts on the Istanbul local closing date. `ToplamCiro` and hourly ciro are net of receipt discount; product row totals are gross before receipt-level discount. `AcikAdisyon` separately counts open receipts created on the queried Istanbul local date. Payment subtotals reconcile to net ciro.
 - Reservations require an existing unmerged table, nonblank customer <=100 characters, 1–20 people, optional phone <=30 characters with digits/spaces/+/-/parentheses, and future time within a year. A table's reservations must be at least two hours apart; a reservation within two hours is rejected if occupied. Reservations within ±2 hours of now flag a table reserved. Delete removes the reservation. This simple fixed window is a demo policy, not a real scheduling/capacity model.
@@ -88,4 +103,4 @@ Every successful mutation emits **`Changes` with no payload**. Refetch whichever
 
 ## Limitations
 
-Demo is not a production POS: state disappears on restart, there is no durable store/outbox, cross-instance locking, optimistic version/ETag contract, printing, real settlement/refund, ERP integration, tax calculation, stock deduction, audit persistence or production user directory. Payment validates header ID and exact current balance, not a client snapshot revision (no revision exists in the supplied contract). Readiness updates are serialized within this one process only. DatabaseReady stays false even when the demo is healthy. Do not deploy demo data/accounts or pretend SQL readiness.
+Demo is not a production POS: state disappears on restart, there is no durable store/outbox, cross-instance locking, optimistic version/ETag contract, physical printer acknowledgement, real settlement/refund, ERP integration, tax calculation, stock deduction, audit persistence or production user directory. Payment validates header ID and current balance, not a client snapshot revision (no revision exists in the supplied contract). Readiness updates are serialized within this one process only. DatabaseReady stays false even when the demo is healthy. Do not deploy demo accounts or pretend SQL readiness.

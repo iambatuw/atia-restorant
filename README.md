@@ -9,6 +9,12 @@ ATIA'nın masaüstü restoran uygulamasını web ortamına taşıyoruz. Bu depod
 
 Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük rapor ve rezervasyon var. Giriş ekranı korunarak diğer personel ekranları yeniden düzenlendi. Masaüstünden hangi özelliklerin taşınmaya değer olduğunu ve hangi bağlantıların beklediğini [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) anlattık.
 
+### Ekranlardan örnekler
+
+![Gerekçeli iptal ve zayi penceresi](docs/screenshots/iptal-zayi.png)
+
+![Günlük rapordaki vardiya kapanışı](docs/screenshots/vardiya-kapanisi.png)
+
 ## Bugün neler çalışıyor?
 
 | Alan | Demo ortamında yapabilecekleriniz | Sınır |
@@ -51,6 +57,11 @@ Gerekenler: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). De
 Depo kökünde:
 
 ```powershell
+foreach ($role in 'Admin','Waiter','Kitchen') {
+    $password = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+    Set-Item -Path "Env:Demo__$($role)Password" -Value $password
+    Write-Host "$role parolası: $password"
+}
 dotnet run --environment Development --urls "http://127.0.0.1:5080"
 ```
 
@@ -58,15 +69,15 @@ Personel girişi için `http://127.0.0.1:5080/login`, müşteri menüsü için `
 
 ### Demo hesapları
 
-Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir:
+Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir. Üç farklı parola yukarıdaki komutta üretilir; çıktıdaki parolaları ilgili hesapla kullanın. Parolalar depoda tutulmaz.
 
-| Rol | Kullanıcı adı | Şifre |
+| Rol | Kullanıcı adı | Parola değişkeni |
 | --- | --- | --- |
-| Yönetici | `admin` | `demo123` |
-| Garson | `garson` | `demo123` |
-| Mutfak | `mutfak` | `demo123` |
+| Yönetici | `admin` | `Demo__AdminPassword` |
+| Garson | `garson` | `Demo__WaiterPassword` |
+| Mutfak | `mutfak` | `Demo__KitchenPassword` |
 
-Demo siparişleri, rezervasyonları ve ödemeleri kalıcı değildir. Sunucuyu yeniden başlattığınızda başlangıç verisine dönersiniz. Bu hesapları gerçek işletme kurulumu için kullanmayın.
+Demo yalnızca aynı bilgisayardan erişilen istekleri kabul eder. İmzalı oturum belirtecindeki rol sunucuda doğrulanır; istek gövdesindeki rol veya personel alanı yetki vermez. Demo siparişleri, rezervasyonları ve ödemeleri kalıcı değildir. Sunucuyu yeniden başlattığınızda başlangıç verisine dönersiniz. Bu hesapları gerçek işletme kurulumu için kullanmayın.
 
 ### Arayüz üzerinde çalışmak
 
@@ -108,7 +119,7 @@ npm test
 npm run build
 ```
 
-8 Kasım 2026 kontrolünde 32 API ve 16 arayüz testi geçti; üretim derlemesi de tamamlandı. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
+8 Kasım 2026 kontrolünde 34 API ve 16 arayüz testi geçti; üretim derlemesi de tamamlandı. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
 
 ## Canlı kullanımdan önce
 
