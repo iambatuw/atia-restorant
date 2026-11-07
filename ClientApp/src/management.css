@@ -1,0 +1,477 @@
+/* ==========================================================================
+   MANAGEMENT, REPORTS & RESERVATIONS STYLES
+   Clean dataviz tables, tabular numbers, calm surfaces,
+   quiet borders, and accessible ledger views.
+   ========================================================================== */
+
+.mgmt-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ─── DATE PICKER BAR & CONTROLS ─────────────────────────────────────────── */
+.report-date-control,
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.date-picker-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.date-picker-label input[type="date"] {
+  min-height: 38px;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 0.16s ease;
+}
+
+.date-picker-label input[type="date"]:focus-visible {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(45, 34, 25, 0.06);
+}
+
+/* ─── KPI METRICS TILES ──────────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.15rem 1.25rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(45, 34, 25, 0.03);
+  gap: 0.5rem;
+}
+
+.kpi-card.highlight {
+  border-color: rgba(160, 82, 45, 0.35);
+  background: var(--paper);
+}
+
+.kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.kpi-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.kpi-icon {
+  color: var(--ink-soft);
+}
+
+.kpi-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 5px;
+  background: var(--paper-muted);
+  color: var(--ink-soft);
+}
+
+.kpi-badge.primary {
+  background: rgba(160, 82, 45, 0.12);
+  color: var(--accent);
+}
+
+.kpi-badge.warning {
+  background: var(--reserved-bg);
+  color: var(--reserved);
+}
+
+.kpi-value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.kpi-footer {
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+}
+
+/* ─── DUAL GRID LAYOUT ───────────────────────────────────────────────────── */
+.mgmt-dual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 1.25rem;
+}
+
+.mgmt-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(45, 34, 25, 0.03);
+  gap: 1rem;
+}
+
+.mgmt-panel.full-width {
+  grid-column: 1 / -1;
+}
+
+.panel-title-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-title-bar h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.panel-sub {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0.2rem 0 0;
+}
+
+.panel-meta {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── PAYMENT PROGRESS BAR & LEDGER ──────────────────────────────────────── */
+.payment-progress-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--line);
+  gap: 2px;
+}
+
+.progress-seg {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.progress-seg.cash { background: #4A7C5E; }
+.progress-seg.card { background: #3B729F; }
+.progress-seg.meal { background: #A0522D; }
+.progress-seg.account { background: #7C5E99; }
+
+.payment-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ledger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 7px;
+  background: var(--canvas);
+  font-size: 0.85rem;
+}
+
+.ledger-row.discount {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.ledger-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1;
+}
+
+.ledger-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ledger-dot.cash { background: #4A7C5E; }
+.ledger-dot.card { background: #3B729F; }
+.ledger-dot.meal { background: #A0522D; }
+.ledger-dot.account { background: #7C5E99; }
+.ledger-dot.discount { background: var(--danger); }
+
+.ledger-share {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  width: 48px;
+  text-align: right;
+}
+
+.ledger-val {
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  width: 110px;
+  text-align: right;
+}
+
+.ledger-row.discount .ledger-val {
+  color: var(--danger);
+}
+
+/* ─── DATA TABLES ────────────────────────────────────────────────────────── */
+.table-scroll,
+.top-sellers-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.craft-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.craft-table th {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.craft-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.craft-table tr:last-child td {
+  border-bottom: none;
+}
+
+.craft-table .align-right {
+  text-align: right;
+}
+
+.craft-table .font-numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-cell {
+  width: 44px;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: var(--paper-muted);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-badge.rank-1 {
+  background: rgba(160, 82, 45, 0.15);
+  color: var(--accent);
+}
+
+.qty-tag {
+  display: inline-flex;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: var(--canvas);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.tag-pill {
+  display: inline-flex;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: var(--canvas);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.hour-bar-track {
+  width: 100%;
+  max-width: 140px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.hour-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+/* ─── RESERVATIONS TABLE ─────────────────────────────────────────────────── */
+.time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.guest-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.table-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  background: var(--paper-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.guest-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.icon-button:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ─── CRAFT FORM (MODAL) ─────────────────────────────────────────────────── */
+.craft-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.craft-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.craft-form input,
+.craft-form select,
+.craft-form textarea {
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-family: inherit;
+  transition: border-color 0.16s ease;
+}
+
+.craft-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.craft-form input:focus-visible,
+.craft-form select:focus-visible,
+.craft-form textarea:focus-visible {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(45, 34, 25, 0.06);
+}
+
+.craft-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .craft-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,477 @@
+/* ==========================================================================
+   WORKSPACE SHELL & GLOBAL OPERATIONAL LAYOUT
+   Inspired by andreas.vision: clean editorial typography, quiet borders,
+   calm surfaces, tabular figures, no floating marketing fluff.
+   ========================================================================== */
+
+.workspace-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.011em;
+}
+
+/* ─── HEADER BAR ───────────────────────────────────────────────────────────── */
+.workspace-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.workspace-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  max-width: 1720px;
+  margin-inline: auto;
+  padding: 0.75rem clamp(1rem, 2.5vw, 2.5rem);
+  min-height: 60px;
+}
+
+.workspace-left {
+  display: flex;
+  align-items: center;
+  gap: clamp(1.25rem, 2.5vw, 2.75rem);
+  min-width: 0;
+}
+
+/* ─── TYPOGRAPHIC BRAND WORDMARK ─────────────────────────────────────────── */
+.workspace-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  text-decoration: none;
+  color: var(--ink);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.workspace-brand .brand-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: var(--ink);
+}
+
+.workspace-brand .brand-sub {
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink-soft);
+}
+
+/* ─── HORIZONTAL DESKTOP NAVIGATION ──────────────────────────────────────── */
+.workspace-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.workspace-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.workspace-nav-btn:hover {
+  color: var(--ink);
+  background: var(--paper-muted);
+}
+
+.workspace-nav-btn.active {
+  color: var(--ink);
+  background: var(--canvas);
+  border-color: var(--line);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(45, 34, 25, 0.04);
+}
+
+/* ─── HEADER ACTIONS ──────────────────────────────────────────────────────── */
+.workspace-right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.workspace-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+
+.workspace-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.workspace-status-pill .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.workspace-status-pill.live {
+  color: var(--free);
+  border-color: rgba(74, 124, 94, 0.25);
+  background: var(--free-bg);
+}
+
+.workspace-status-pill.live .status-dot {
+  background: var(--free);
+}
+
+.workspace-status-pill.connecting {
+  color: var(--reserved);
+  border-color: rgba(138, 107, 48, 0.25);
+  background: var(--reserved-bg);
+}
+
+.workspace-status-pill.connecting .status-dot {
+  background: var(--reserved);
+  animation: pulse-dot 1.4s ease infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.workspace-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  transition: color 0.16s, background-color 0.16s, border-color 0.16s;
+}
+
+.workspace-icon-btn:hover {
+  color: var(--ink);
+  background: var(--paper-muted);
+  border-color: var(--line-strong);
+}
+
+.workspace-qr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.16s, background-color 0.16s, border-color 0.16s;
+}
+
+.workspace-qr-btn:hover {
+  color: var(--ink);
+  background: var(--paper-muted);
+  border-color: var(--line-strong);
+}
+
+.workspace-user {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-left: 0.65rem;
+  border-left: 1px solid var(--line);
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  line-height: 1.25;
+}
+
+.user-meta .user-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.user-meta .user-role {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.workspace-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: color 0.16s, background-color 0.16s, border-color 0.16s;
+}
+
+.workspace-logout-btn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ─── MOBILE SECONDARY NAV STRIP ─────────────────────────────────────────── */
+.workspace-mobile-nav {
+  display: none;
+  overflow-x: auto;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  scrollbar-width: none;
+}
+
+.workspace-mobile-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-mobile-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.workspace-mobile-nav-btn.active {
+  color: var(--ink);
+  background: var(--canvas);
+  border-color: var(--line);
+  font-weight: 600;
+}
+
+/* ─── DEMO MODE NOTICE ───────────────────────────────────────────────────── */
+.workspace-demo-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem clamp(1rem, 2.5vw, 2.5rem);
+  background: var(--reserved-bg);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  max-width: 1720px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.workspace-demo-notice .demo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--reserved);
+  flex-shrink: 0;
+}
+
+.workspace-demo-notice strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ─── MAIN CONTENT VIEWPORT ──────────────────────────────────────────────── */
+.workspace-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1720px;
+  margin-inline: auto;
+  padding: clamp(1.2rem, 2.5vw, 2.2rem) clamp(1rem, 2.5vw, 2.5rem) 2.5rem;
+}
+
+/* ─── PUBLIC MENU SHELL ──────────────────────────────────────────────────── */
+.public-menu-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem clamp(1rem, 3.5vw, 3.5rem);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.public-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.public-brand .brand-primary {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: var(--ink);
+}
+
+.public-brand .brand-secondary {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.public-brand .brand-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 5px;
+  background: var(--paper-muted);
+  color: var(--ink-soft);
+  margin-left: 0.35rem;
+}
+
+.public-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.public-staff-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 38px;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition: background-color 0.16s, border-color 0.16s;
+}
+
+.public-staff-btn:hover {
+  background: var(--paper-muted);
+}
+
+.public-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1400px;
+  margin-inline: auto;
+  padding: 2rem clamp(1rem, 3.5vw, 3.5rem) 3.5rem;
+}
+
+.public-intro {
+  margin-bottom: 2rem;
+}
+
+.public-intro h1 {
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  margin: 0 0 0.5rem;
+}
+
+.public-intro p {
+  color: var(--ink-soft);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* ─── RESPONSIVE BREAKPOINTS ─────────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .workspace-nav {
+    display: none;
+  }
+  .workspace-mobile-nav {
+    display: flex;
+  }
+  .workspace-clock {
+    display: none;
+  }
+  .workspace-qr-btn {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace-header-inner {
+    padding-inline: 1rem;
+  }
+  .user-meta {
+    display: none;
+  }
+  .workspace-logout-btn .logout-text {
+    display: none;
+  }
+  .workspace-logout-btn {
+    padding-inline: 0.5rem;
+    min-height: 38px;
+    width: 38px;
+    justify-content: center;
+  }
+  .workspace-icon-btn {
+    min-height: 38px;
+    width: 38px;
+  }
+}

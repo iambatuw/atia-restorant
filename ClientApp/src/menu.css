@@ -1,0 +1,305 @@
+/* ==========================================================================
+   MENU CATALOG & PRODUCT PICKER STYLES
+   Editorial card layouts, clear price hierarchy, tabular figures,
+   responsive category navigation.
+   ========================================================================== */
+
+.menu-showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.menu-showcase.picker-mode {
+  gap: 1rem;
+}
+
+/* ─── MENU STATS PILL ────────────────────────────────────────────────────── */
+.menu-stats-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-stats-pill strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ─── SEARCH & CATEGORY BAR ──────────────────────────────────────────────── */
+.menu-nav-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.menu-search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+}
+
+.menu-search-wrapper input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.5rem 2.4rem 0.5rem 2.4rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.menu-search-wrapper input:focus-visible {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(45, 34, 25, 0.06);
+}
+
+.menu-search-wrapper .search-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--paper-muted);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.16s;
+}
+
+.clear-search-btn:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+/* ─── CATEGORY TABS ──────────────────────────────────────────────────────── */
+.category-scroll-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 36px;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.cat-pill:hover {
+  color: var(--ink);
+  background: var(--paper-muted);
+}
+
+.cat-pill.selected {
+  color: var(--ink);
+  background: var(--canvas);
+  border-color: var(--line-strong);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(45, 34, 25, 0.04);
+}
+
+.cat-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 0.35rem;
+  border-radius: 10px;
+  background: var(--line);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.cat-pill.selected .cat-count {
+  background: var(--paper-muted);
+}
+
+/* ─── DISH GRID ──────────────────────────────────────────────────────────── */
+.dish-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.95rem;
+}
+
+.picker-mode .dish-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  max-height: 520px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.dish-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--paper);
+  box-shadow: 0 1px 3px rgba(45, 34, 25, 0.03);
+  transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+.dish-card:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.dish-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.dish-category-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.dish-card-body {
+  flex: 1;
+  margin-bottom: 0.75rem;
+}
+
+.dish-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+.dish-card-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+}
+
+.dish-price-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.price-label {
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dish-price {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.dish-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.dish-add-btn:hover:not(:disabled) {
+  background: var(--paper-muted);
+}
+
+.dish-add-btn.added {
+  background: var(--free-bg);
+  color: var(--free);
+  border-color: var(--free);
+}
+
+/* ─── PUBLIC MENU FOOTER ─────────────────────────────────────────────────── */
+.public-menu-footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.allergen-box {
+  padding: 1.25rem;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  max-width: 800px;
+}
+
+.allergen-box h4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 0.35rem;
+}
+
+.allergen-box p {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
+}
