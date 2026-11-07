@@ -379,6 +379,39 @@ public class GunlukRaporDTO
     public decimal IndirimToplam { get; set; }
     public List<SaatlikCiroDTO> SaatlikCiro { get; set; } = new();
     public List<UrunSatisDTO> EnCokSatan { get; set; } = new();
+    public GunlukMutabakatDTO Mutabakat { get; set; } = new();
+}
+
+public class IslemKaydiDTO
+{
+    public long KayitNo { get; set; }
+    public DateTime Tarih { get; set; }
+    public string Islem { get; set; } = "";
+    public string Aciklama { get; set; } = "";
+    public long? AdisyonNo { get; set; }
+    public int PersonelId { get; set; }
+    public string PersonelAdi { get; set; } = "";
+    public decimal Tutar { get; set; }
+    public decimal Nakit { get; set; }
+    public decimal Banka { get; set; }
+    public decimal YemekKarti { get; set; }
+    public decimal Cari { get; set; }
+    public decimal Indirim { get; set; }
+}
+
+public class GunlukMutabakatDTO
+{
+    public decimal KapananSatis { get; set; }
+    public decimal Tahsilat { get; set; }
+    public decimal Fark { get; set; }
+    public decimal Nakit { get; set; }
+    public decimal Banka { get; set; }
+    public decimal YemekKarti { get; set; }
+    public decimal Cari { get; set; }
+    public decimal Indirim { get; set; }
+    public decimal SilinenUrunTutari { get; set; }
+    public decimal IkramTutari { get; set; }
+    public int OdemeSayisi { get; set; }
 }
 
 public class SaatlikCiroDTO

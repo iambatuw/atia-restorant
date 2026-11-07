@@ -14,6 +14,46 @@ public sealed class RepositoryTests
         new() { MasaKayitNo = table, StokKayitNo = 4, Miktar = quantity, BirimFiyat = 0.01m, PersonelKayitNo = 999 };
 
     [Fact]
+    public void AuditUsesVerifiedActorAndReconciliationCountsOnlySuccessfulOperations()
+    {
+        var repository = Repository();
+        var date = repository.BusinessToday;
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.Audit(date, Waiter)).Status);
+        var receipt = repository.AddOrder(Order(), Waiter);
+        var line = Assert.Single(receipt.Detaylar);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.UpdateOrder(line.KayitNo,
+            new() { Miktar = 1, Ikram = true }, Waiter)).Status);
+        Assert.DoesNotContain(repository.Audit(date, Admin), entry => entry.Islem == "İkram verildi");
+        repository.DeleteOrder(line.KayitNo, Waiter);
+        var replacement = repository.AddOrder(Order(), Waiter);
+        repository.Pay(12, new() { BaslikKayitNo = replacement.KayitNo, NakitTutar = 100, KismiOdeme = true }, Admin);
+        repository.Pay(12, new() { BaslikKayitNo = replacement.KayitNo, BankaTutar = 220 }, Admin);
+        var history = repository.Audit(date, Admin);
+        Assert.Contains(history, entry => entry.Islem == "Ürün silindi" && entry.PersonelId == Waiter.Id && entry.Tutar == 320m);
+        Assert.Equal(2, history.Count(entry => entry.Islem == "Ödeme alındı" &&
+            entry.PersonelId == Admin.Id && entry.AdisyonNo == replacement.KayitNo));
+        var total = repository.DailyReport(date, Admin).Mutabakat;
+        Assert.Equal(100m, total.Nakit);
+        Assert.Equal(700m, total.Banka); // Seeded closed adisyon: 480 TL.
+        Assert.Equal(320m, total.SilinenUrunTutari);
+        Assert.Equal(3, total.OdemeSayisi);
+        Assert.Equal(800m, total.Tahsilat);
+        Assert.Equal(0m, total.Fark);
+    }
+
+    [Fact]
+    public void MergedSourceReceiptIsNotCountedAsAnotherSale()
+    {
+        var repository = Repository();
+        var before = repository.DailyReport(repository.BusinessToday, Admin);
+        repository.Merge(new() { AnaMasaKayitNo = 1, BirlestirilecekMasaKayitNolar = [3] }, Admin);
+        var after = repository.DailyReport(repository.BusinessToday, Admin);
+        Assert.Equal(before.ToplamCiro, after.ToplamCiro);
+        Assert.Equal(before.ToplamAdisyon, after.ToplamAdisyon);
+        Assert.Contains(repository.Audit(repository.BusinessToday, Admin), entry => entry.Islem == "Masalar birleştirildi");
+    }
+
+    [Fact]
     public void DeliveryUsesMenuPricesAndRejectsDuplicateOrInvalidStatusChanges()
     {
         var repository = Repository();
@@ -449,5 +489,25 @@ public sealed class RepositoryTests
         // Pos transaction is marked as recorded in ERP
         var recordedPos = repository.PosIslemSorgula(tx.IslemId);
         Assert.Equal(PosDurum.ErpKaydedildi, recordedPos.Durum);
+    }
+
+    [Fact]
+    public void PosApprovalCannotBeReusedOrAppliedToAnotherAmount()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(), Waiter);
+        var tx = repository.PosIslemBaslat(new() { MasaKayitNo = 12, BaslikKayitNo = receipt.KayitNo,
+            Tutar = 100m, CihazTipi = PosCihazTipi.HariciManuelPos }, Admin);
+        var wrongAmount = new OdemeRequest { BaslikKayitNo = receipt.KayitNo, BankaTutar = 90m,
+            KismiOdeme = true, PosIslemId = tx.IslemId };
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Pay(12, wrongAmount, Admin)).Status);
+        Assert.Equal(0m, repository.Receipt(12)!.BankaToplam ?? 0m);
+        Assert.DoesNotContain(repository.Audit(repository.BusinessToday, Admin), item =>
+            item.Islem == "Ödeme alındı" && item.AdisyonNo == receipt.KayitNo);
+        var payment = new OdemeRequest { BaslikKayitNo = receipt.KayitNo, BankaTutar = 100m,
+            KismiOdeme = true, PosIslemId = tx.IslemId };
+        repository.Pay(12, payment, Admin);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.Pay(12, payment, Admin)).Status);
+        Assert.Equal(100m, repository.Receipt(12)!.BankaToplam);
     }
 }

@@ -2,7 +2,7 @@ import {useState} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {CalendarDays,Plus,Trash2} from 'lucide-react';
 import {api,localDate,money} from './api';
-import type {Report,Reservation,Table} from './types';
+import type {AuditEntry,Report,Reservation,Table} from './types';
 import {Empty,ErrorBox,Loading,Modal} from './ui';
 
 export default function Management({page}:{page:'raporlar'|'rezervasyonlar'}){return page==='raporlar'?<Reports/>:<Reservations/>;}
@@ -10,17 +10,28 @@ export default function Management({page}:{page:'raporlar'|'rezervasyonlar'}){re
 function Reports(){
   const [date,setDate]=useState(localDate());
   const report=useQuery({queryKey:['report',date],queryFn:()=>api<Report>(`/raporlar/gunluk?tarih=${date}`),refetchInterval:15000});
+  const history=useQuery({queryKey:['audit',date],queryFn:()=>api<AuditEntry[]>(`/raporlar/islemler?tarih=${date}`),refetchInterval:15000});
   const data=report.data;
-  const payments=data?[['Nakit',data.NakitToplam],['Banka kartı',data.BankaToplam],['Yemek kartı',data.YemekKartiToplam],['Cari',data.CariToplam]] as const:[];
+  const payments=data?[['Nakit',data.Mutabakat.Nakit],['Banka kartı',data.Mutabakat.Banka],['Yemek kartı',data.Mutabakat.YemekKarti],['Cari',data.Mutabakat.Cari]] as const:[];
   const maxHour=Math.max(1,...(data?.SaatlikCiro.map(hour=>hour.Ciro)??[]));
   return <section className="op-page op-report" aria-label="Günlük rapor">
     <header className="op-page-head"><div><h1>Günlük rapor</h1><p>Satış ve tahsilatın kesinleşen kayıtları</p></div><label className="op-date-field">Tarih <input type="date" value={date} max={localDate()} onChange={e=>setDate(e.target.value)}/></label></header>
     <ErrorBox error={report.error} retry={()=>void report.refetch()}/>
+    <ErrorBox error={history.error} retry={()=>void history.refetch()}/>
     {report.isPending?<Loading/>:data&&<>
-      <div className="op-report-lead"><div><span>Toplam tahsilat</span><strong>{money(data.ToplamCiro)}</strong><small>{data.ToplamAdisyon} kapanan adisyon</small></div><div><span>Açık adisyon</span><strong>{data.AcikAdisyon}</strong><small>Şu anda açık</small></div><div><span>Adisyon ortalaması</span><strong>{money(data.ToplamAdisyon?data.ToplamCiro/data.ToplamAdisyon:0)}</strong><small>Kapanan adisyon başına</small></div></div>
-      <div className="op-report-columns"><section className="op-panel"><div className="op-panel-head"><h2>Tahsilat türleri</h2></div><div className="op-report-rows">{payments.map(([name,value])=><div key={name}><span>{name}</span><strong>{money(value)}</strong></div>)}{data.IndirimToplam>0&&<div><span>İndirim</span><strong>{money(data.IndirimToplam)}</strong></div>}</div></section>
+      <div className="op-report-lead"><div><span>Kapanan satış</span><strong>{money(data.ToplamCiro)}</strong><small>{data.ToplamAdisyon} kapanan adisyon</small></div><div><span>Açık adisyon</span><strong>{data.AcikAdisyon}</strong><small>Şu anda açık</small></div><div><span>Adisyon ortalaması</span><strong>{money(data.ToplamAdisyon?data.ToplamCiro/data.ToplamAdisyon:0)}</strong><small>Kapanan adisyon başına</small></div></div>
+      <div className="op-report-columns"><section className="op-panel"><div className="op-panel-head"><h2>Bugünkü tahsilatlar</h2></div><div className="op-report-rows">{payments.map(([name,value])=><div key={name}><span>{name}</span><strong>{money(value)}</strong></div>)}{data.Mutabakat.Indirim>0&&<div><span>İndirim</span><strong>{money(data.Mutabakat.Indirim)}</strong></div>}</div></section>
       <section className="op-panel"><div className="op-panel-head"><h2>En çok satan ürünler</h2></div>{data.EnCokSatan.length?<div className="op-report-rows">{data.EnCokSatan.slice(0,8).map(item=><div key={item.StokAdi}><span>{item.StokAdi}<small>{item.ToplamMiktar} adet</small></span><strong>{money(item.ToplamTutar)}</strong></div>)}</div>:<div className="op-inline-empty">Bu tarihte ürün satışı yok.</div>}</section></div>
-      <section className="op-panel op-hour-panel"><div className="op-panel-head"><h2>Saatlik tahsilat</h2></div>{data.SaatlikCiro.length?<div className="op-hours">{data.SaatlikCiro.map(hour=><div key={hour.Saat}><span>{String(hour.Saat).padStart(2,'0')}:00</span><div><i style={{width:`${Math.max(2,hour.Ciro/maxHour*100)}%`}}/></div><strong>{money(hour.Ciro)}</strong></div>)}</div>:<div className="op-inline-empty">Bu tarihte saatlik tahsilat kaydı yok.</div>}</section>
+      <section className="op-panel op-hour-panel"><div className="op-panel-head"><h2>Saatlik kapanan satış</h2></div>{data.SaatlikCiro.length?<div className="op-hours">{data.SaatlikCiro.map(hour=><div key={hour.Saat}><span>{String(hour.Saat).padStart(2,'0')}:00</span><div><i style={{width:`${Math.max(2,hour.Ciro/maxHour*100)}%`}}/></div><strong>{money(hour.Ciro)}</strong></div>)}</div>:<div className="op-inline-empty">Bu tarihte kapanan satış yok.</div>}</section>
+      <section className="op-panel op-reconciliation"><div className="op-panel-head"><h2>Gün sonu mutabakatı</h2></div><div className="op-report-rows">
+        <div><span>Kapanan adisyon satışı</span><strong>{money(data.Mutabakat.KapananSatis)}</strong></div>
+        <div><span>Alınan ödemeler <small>{data.Mutabakat.OdemeSayisi} işlem</small></span><strong>{money(data.Mutabakat.Tahsilat)}</strong></div>
+        <div><span>Nakit / banka / yemek kartı / cari</span><strong>{[data.Mutabakat.Nakit,data.Mutabakat.Banka,data.Mutabakat.YemekKarti,data.Mutabakat.Cari].map(money).join(' / ')}</strong></div>
+        <div><span>İndirim</span><strong>{money(data.Mutabakat.Indirim)}</strong></div>
+        <div><span>Silinen ürün / ikram <small>Bilgi amaçlı; tahsilata eklenmez</small></span><strong>{money(data.Mutabakat.SilinenUrunTutari)} / {money(data.Mutabakat.IkramTutari)}</strong></div>
+        <div><span>Satış − tahsilat <small>Farklı günlerde alınan kısmi ödemeler fark oluşturabilir</small></span><strong>{money(data.Mutabakat.Fark)}</strong></div>
+      </div></section>
+      <section className="op-panel op-audit"><div className="op-panel-head"><h2>İşlem geçmişi</h2><small>Yalnızca yöneticiler</small></div>{history.isPending?<Loading/>:history.data?.length?<div className="op-audit-list">{history.data.map(item=><div className="op-audit-row" key={item.KayitNo}><time dateTime={item.Tarih}>{new Date(item.Tarih).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</time><div><strong>{item.Islem}</strong><span>{item.Aciklama}</span></div><span>{item.PersonelAdi}</span>{item.Tutar>0&&<b>{money(item.Tutar)}</b>}</div>)}</div>:<div className="op-inline-empty">Bu tarihte kayıtlı işlem yok.</div>}</section>
       <p className="op-report-note">Paket servis kayıtları henüz bu tahsilat raporuna dahil değildir.</p>
     </>}
   </section>;

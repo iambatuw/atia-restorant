@@ -34,6 +34,9 @@ public sealed class RestaurantRepository
     private readonly Dictionary<long, DateTime> _closedAt = [];
     private readonly Dictionary<string, PosIslemKayitDTO> _posTransactions = [];
     private readonly Dictionary<string, string> _posIdempotency = [];
+    private readonly List<IslemKaydiDTO> _audit = [];
+    private readonly HashSet<long> _mergedReceipts = [];
+    private long _nextAudit;
     private long _nextReceipt = 1000, _nextLine = 10000, _nextReservation = 100, _nextDelivery = 3000;
     private DateTime Now => _clock.GetUtcNow().UtcDateTime;
     private static readonly TimeZoneInfo RestaurantTimeZone = FindRestaurantTimeZone();
@@ -77,6 +80,21 @@ public sealed class RestaurantRepository
     }
     private static void Staff(StaffActor actor, params string[] roles) =>
         Require(actor.Id > 0 && roles.Contains(actor.Role), "Bu işlem için yetkiniz yok.", 403);
+    private void Log(StaffActor actor, string action, string detail, long? receiptId = null, decimal amount = 0,
+        OdemeRequest? payment = null) => _audit.Add(new IslemKaydiDTO
+    {
+        KayitNo = ++_nextAudit, Tarih = Now, Islem = action, Aciklama = detail,
+        AdisyonNo = receiptId, PersonelId = actor.Id, PersonelAdi = actor.Name, Tutar = amount,
+        Nakit = payment?.NakitTutar ?? 0, Banka = payment?.BankaTutar ?? 0,
+        YemekKarti = payment?.YemekKartiTutar ?? 0, Cari = payment?.CariTutar ?? 0,
+        Indirim = payment?.IndirimTutar ?? 0
+    });
+    public List<IslemKaydiDTO> Audit(DateOnly date, StaffActor actor) => Read(() =>
+    {
+        Staff(actor, "Admin");
+        return _audit.Where(item => BusinessDate(item.Tarih) == date)
+            .OrderByDescending(item => item.KayitNo).ToList();
+    });
     private static void Quantity(decimal quantity) => Require(quantity > 0 && quantity <= 100 &&
         decimal.Round(quantity, 3) == quantity, "Miktar 0'dan büyük, en fazla 100 ve üç ondalıklı olmalı.");
     private static void Note(string? note) => Require(note is null || note.Length <= 500, "Açıklama en fazla 500 karakter olabilir.");
@@ -218,6 +236,7 @@ public sealed class RestaurantRepository
         receipt.Detaylar.Add(line);
         _ready[line.KayitNo] = 0;
         Recalculate(receipt);
+        Log(actor, "Ürün eklendi", $"{receipt.MasaAdi}: {line.Miktar} × {line.StokAdi}", receipt.KayitNo, line.SatirTutari);
         return receipt;
     });
 
@@ -233,10 +252,16 @@ public sealed class RestaurantRepository
         Require(receipt.GenelToplam - line.SatirTutari + newLineTotal >= paid, "Sipariş toplamı alınmış ödemeden düşük olamaz.", 409);
         // Clamp on reduction so decreasing then increasing never resurrects readiness.
         _ready[id] = Math.Min(_ready.GetValueOrDefault(id), request.Miktar);
+        var previousAmount = line.SatirTutari;
+        var wasGift = line.Ikram;
         line.Miktar = request.Miktar;
         line.SatirAciklama = request.SatirAciklama?.Trim();
         line.Ikram = request.Ikram;
         Recalculate(receipt);
+        if (wasGift != line.Ikram)
+            Log(actor, line.Ikram ? "İkram verildi" : "İkram kaldırıldı",
+                $"{receipt.MasaAdi}: {line.StokAdi}", receipt.KayitNo, line.Ikram ? previousAmount : line.SatirTutari);
+        else Log(actor, "Ürün değiştirildi", $"{receipt.MasaAdi}: {line.StokAdi}, adet {line.Miktar}", receipt.KayitNo);
         return receipt;
     });
 
@@ -246,6 +271,7 @@ public sealed class RestaurantRepository
         var (receipt, line) = Line(id);
         var paid = (receipt.NakitToplam ?? 0) + (receipt.BankaToplam ?? 0) + (receipt.CariToplam ?? 0) + (receipt.YemekKartiToplam ?? 0) + (receipt.IndirimToplam ?? 0);
         Require(receipt.GenelToplam - line.SatirTutari >= paid, "Sipariş toplamı alınmış ödemeden düşük olamaz.", 409);
+        Log(actor, "Ürün silindi", $"{receipt.MasaAdi}: {line.Miktar} × {line.StokAdi}", receipt.KayitNo, line.SatirTutari);
         receipt.Detaylar.Remove(line); _ready.Remove(id);
         Recalculate(receipt);
         // Keep even an empty receipt open until an administrator explicitly closes it.
@@ -268,6 +294,14 @@ public sealed class RestaurantRepository
         decimal oncekiOdenen = oncekiNakit + oncekiBanka + oncekiCari + oncekiYemek + oncekiIndirim;
         decimal kalanTutar = receipt.GenelToplam - oncekiOdenen;
         decimal buOdemeToplami = values.Sum();
+        PosIslemKayitDTO? posTx = null;
+        if (!string.IsNullOrWhiteSpace(request.PosIslemId))
+        {
+            Require(_posTransactions.TryGetValue(request.PosIslemId, out posTx), "POS işlemi bulunamadı.", 404);
+            Require(posTx!.Durum == PosDurum.Onaylandi && posTx.BaslikKayitNo == receipt.KayitNo &&
+                posTx.MasaKayitNo == tableId && posTx.Tutar == request.BankaTutar,
+                "POS onayı bu adisyon ve banka ödemesiyle eşleşmiyor.", 409);
+        }
 
         if (request.KismiOdeme)
         {
@@ -297,11 +331,12 @@ public sealed class RestaurantRepository
             _closedAt[receipt.KayitNo] = Now;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.PosIslemId) && _posTransactions.TryGetValue(request.PosIslemId, out var posTx))
-        {
-            Require(posTx.Basarili, "POS işlemi onaylanmamış veya belirsiz durumda.");
+        if (posTx is not null)
             posTx.Durum = PosDurum.ErpKaydedildi;
-        }
+
+        Log(actor, "Ödeme alındı", $"{receipt.MasaAdi}: {(request.KismiOdeme ? "kısmi" : "tam")} ödeme",
+            receipt.KayitNo, request.NakitTutar + request.BankaTutar + request.YemekKartiTutar + request.CariTutar,
+            request);
 
         return receipt;
     });
@@ -316,6 +351,7 @@ public sealed class RestaurantRepository
         var receipt = Open(source.MasaId) ?? throw new ApiException(409, "Kaynak masa boş.");
         Require(Open(target.MasaId) is null && !Reserved(target.MasaId), "Hedef masa boş ve rezervasyonsuz olmalı.", 409);
         receipt.MasaKayitNo = target.MasaId; receipt.MasaAdi = target.MasaAdi;
+        Log(actor, "Masa taşındı", $"{source.MasaAdi} → {target.MasaAdi}", receipt.KayitNo);
         return receipt;
     });
 
@@ -398,6 +434,7 @@ public sealed class RestaurantRepository
         Recalculate(sourceReceipt);
         Recalculate(targetReceipt);
         _receipts.Add(targetReceipt);
+        Log(actor, "Masa ayrıldı", $"{sourceTable.MasaAdi} → {targetTable.MasaAdi}", sourceReceipt.KayitNo);
 
         return new MasaAyirSonucDTO
         {
@@ -444,9 +481,11 @@ public sealed class RestaurantRepository
 
             childReceipt.Kapali = true;
             _closedAt[childReceipt.KayitNo] = Now;
+            _mergedReceipts.Add(childReceipt.KayitNo);
         }
 
         Recalculate(masterReceipt);
+        Log(actor, "Masalar birleştirildi", $"{masterTable.MasaAdi}: {request.BirlestirilecekMasaKayitNolar.Count} masa", masterReceipt.KayitNo);
         return masterReceipt;
     });
 
@@ -549,7 +588,15 @@ public sealed class RestaurantRepository
     public GunlukRaporDTO DailyReport(DateOnly date, StaffActor actor) => Read(() =>
     {
         Staff(actor, "Admin");
-        var closed = _receipts.Where(r => r.Kapali && BusinessDate(_closedAt[r.KayitNo]) == date).ToList();
+        var closed = _receipts.Where(r => r.Kapali && !_mergedReceipts.Contains(r.KayitNo) &&
+            BusinessDate(_closedAt[r.KayitNo]) == date).ToList();
+        var entries = _audit.Where(item => BusinessDate(item.Tarih) == date).ToList();
+        var payments = entries.Where(item => item.Islem == "Ödeme alındı").ToList();
+        var cash = payments.Sum(item => item.Nakit);
+        var bank = payments.Sum(item => item.Banka);
+        var meal = payments.Sum(item => item.YemekKarti);
+        var account = payments.Sum(item => item.Cari);
+        var sales = closed.Sum(r => r.GenelToplam - (r.IndirimToplam ?? 0));
         return new GunlukRaporDTO {
             ToplamCiro = closed.Sum(r => r.GenelToplam - (r.IndirimToplam ?? 0)), ToplamAdisyon = closed.Count,
             AcikAdisyon = _receipts.Count(r => !r.Kapali && BusinessDate(r.KayitTarihi!.Value) == date),
@@ -560,7 +607,15 @@ public sealed class RestaurantRepository
                 new SaatlikCiroDTO { Saat = g.Key, Ciro = g.Sum(r => r.GenelToplam - (r.IndirimToplam ?? 0)), AdisyonSayisi = g.Count() }).ToList(),
             EnCokSatan = closed.SelectMany(r => r.Detaylar).GroupBy(d => d.StokKayitNo).Select(g => new UrunSatisDTO {
                 StokAdi = g.First().StokAdi, ToplamMiktar = g.Sum(d => d.Miktar), ToplamTutar = g.Sum(d => d.SatirTutari)
-            }).OrderByDescending(p => p.ToplamMiktar).Take(10).ToList()
+            }).OrderByDescending(p => p.ToplamMiktar).Take(10).ToList(),
+            Mutabakat = new GunlukMutabakatDTO {
+                KapananSatis = sales, Tahsilat = cash + bank + meal + account,
+                Fark = sales - cash - bank - meal - account,
+                Nakit = cash, Banka = bank, YemekKarti = meal, Cari = account,
+                Indirim = payments.Sum(item => item.Indirim), OdemeSayisi = payments.Count,
+                SilinenUrunTutari = entries.Where(item => item.Islem == "Ürün silindi").Sum(item => item.Tutar),
+                IkramTutari = entries.Where(item => item.Islem == "İkram verildi").Sum(item => item.Tutar)
+            }
         };
     });
 

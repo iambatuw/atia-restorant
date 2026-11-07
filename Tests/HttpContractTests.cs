@@ -48,6 +48,7 @@ public sealed class HttpContractTests
         using var factory = new ApiFactory();
         using var client = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/session")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/raporlar/islemler")).StatusCode);
         await Login(client, username);
         var result = await client.GetFromJsonAsync<JsonElement>("/api/auth/session");
         Assert.Equal(role, result.GetProperty("Data").GetProperty("Rol").GetString());
@@ -71,11 +72,13 @@ public sealed class HttpContractTests
         await Login(client, "garson");
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/masalar")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/raporlar/gunluk")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/raporlar/islemler")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/masalar/1/odeme", new OdemeRequest())).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/mutfak")).StatusCode);
         await Login(client, "mutfak");
         var kitchen = await client.GetAsync("/api/mutfak");
         Assert.Equal(HttpStatusCode.OK, kitchen.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/raporlar/islemler")).StatusCode);
         var tickets = (await kitchen.Content.ReadFromJsonAsync<ApiResult<List<MutfakSiparisDTO>>>(Json))!.Data!;
         Assert.Equal(2, tickets.Count);
         Assert.All(tickets.SelectMany(t => t.Satirlar), row => Assert.False(row.Hazir));

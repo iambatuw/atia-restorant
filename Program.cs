@@ -182,6 +182,9 @@ api.MapPost("/mutfak/{baslikId:long}/hazir", (long baslikId, ClaimsPrincipal use
 api.MapGet("/raporlar/gunluk", (string? tarih, ClaimsPrincipal user, RestaurantRepository repository) =>
     Results.Ok(ApiResult<GunlukRaporDTO>.Ok(repository.DailyReport(ParseDate(tarih) ?? repository.BusinessToday, Actor(user)))))
     .RequireAuthorization("Admin");
+api.MapGet("/raporlar/islemler", (string? tarih, ClaimsPrincipal user, RestaurantRepository repository) =>
+    Results.Ok(ApiResult<List<IslemKaydiDTO>>.Ok(repository.Audit(ParseDate(tarih) ?? repository.BusinessToday, Actor(user)))))
+    .RequireAuthorization("Admin");
 api.MapGet("/rezervasyonlar", (string? tarih, ClaimsPrincipal user, RestaurantRepository repository) =>
     Results.Ok(ApiResult<List<RezervasyonDTO>>.Ok(repository.Reservations(ParseDate(tarih), Actor(user)))))
     .RequireAuthorization("Admin");
