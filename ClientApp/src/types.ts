@@ -24,6 +24,9 @@ export interface Receipt {
 export interface KitchenTicket {BaslikKayitNo:number;MasaAdi:string;BolumAdi:string;SiparisZamani:string;BeklemeSuresi:number;Satirlar:{DetayKayitNo:number;StokAdi:string;Miktar:number;KalanMiktar:number;SatirAciklama:string|null}[]}
 export interface Report {ToplamCiro:number;ToplamAdisyon:number;AcikAdisyon:number;NakitToplam:number;BankaToplam:number;CariToplam:number;YemekKartiToplam:number;IndirimToplam:number;SaatlikCiro:{Saat:number;Ciro:number;AdisyonSayisi:number}[];EnCokSatan:{StokAdi:string;ToplamMiktar:number;ToplamTutar:number}[]}
 export interface Reservation {KayitNo:number;MasaKayitNo:number;MasaAdi:string;MusteriAdi:string;Telefon:string;RezervasyonTarihi:string;KisiSayisi:number;Aciklama:string}
+export type DeliveryStatus=0|1|2|3|4;
+export interface DeliveryLine {StokKayitNo:number;StokAdi:string;PorsiyonKayitNo:number|null;PorsiyonAdi:string|null;Miktar:number;BirimFiyat:number;SatirTutari:number}
+export interface DeliveryOrder {KayitNo:number;KayitTarihi:string;MusteriAdi:string;Telefon:string;Adres:string;Aciklama:string|null;OdemeSekli:string;Kurye:string|null;Durum:DeliveryStatus;GenelToplam:number;Satirlar:DeliveryLine[]}
 
 // ───── POS CİHAZ ENTEGRASYONU ─────
 export type PosCihazTipi = 0 | 1 | 2; // 0=HariciManuelPos, 1=HuginS1, 2=PayGo

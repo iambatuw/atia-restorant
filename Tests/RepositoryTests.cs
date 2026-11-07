@@ -14,6 +14,32 @@ public sealed class RepositoryTests
         new() { MasaKayitNo = table, StokKayitNo = 4, Miktar = quantity, BirimFiyat = 0.01m, PersonelKayitNo = 999 };
 
     [Fact]
+    public void DeliveryUsesMenuPricesAndRejectsDuplicateOrInvalidStatusChanges()
+    {
+        var repository = Repository();
+        var request = new PaketSiparisEkleRequest
+        {
+            IdempotencyKey = Guid.NewGuid().ToString(), MusteriAdi = "Ayşe", Telefon = "05550000000",
+            Adres = "Merkez Mahallesi", OdemeSekli = "Nakit",
+            Satirlar = [new() { StokKayitNo = 4, Miktar = 2 }]
+        };
+        var delivery = repository.CreateDelivery(request, Waiter);
+        Assert.Equal(640m, delivery.GenelToplam);
+        Assert.Equal(delivery.KayitNo, repository.CreateDelivery(request, Waiter).KayitNo);
+        Assert.Single(repository.Deliveries(Admin));
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.Deliveries(Cook)).Status);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.UpdateDelivery(delivery.KayitNo,
+            new() { Durum = PaketDurum.TeslimEdildi }, Waiter)).Status);
+        repository.UpdateDelivery(delivery.KayitNo, new() { Durum = PaketDurum.Hazirlaniyor }, Waiter);
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.UpdateDelivery(delivery.KayitNo,
+            new() { Durum = PaketDurum.Yolda }, Waiter)).Status);
+        repository.UpdateDelivery(delivery.KayitNo, new() { Durum = PaketDurum.Yolda, Kurye = "Mehmet" }, Waiter);
+        var done = repository.UpdateDelivery(delivery.KayitNo, new() { Durum = PaketDurum.TeslimEdildi }, Waiter);
+        Assert.Equal("Mehmet", done.Kurye);
+        Assert.Equal(PaketDurum.TeslimEdildi, done.Durum);
+    }
+
+    [Fact]
     public async Task ConcurrentOrdersCreateExactlyOneReceiptWithNoLostLines()
     {
         var repository = Repository();
@@ -260,6 +286,28 @@ public sealed class RepositoryTests
                 new() { DetayKayitNo = kofteLine.KayitNo, Miktar = 1 }
             ]
         }, Admin)).Status);
+    }
+
+    [Fact]
+    public void RejectedSplitLeavesSourceAndTargetUnchanged()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(quantity: 2), Waiter);
+        var line = Assert.Single(receipt.Detaylar);
+        Assert.Throws<ApiException>(() => repository.Split(new()
+        {
+            MasaKayitNo = 12, HedefMasaKayitNo = 11,
+            AyrilanSatirlar = [new() { DetayKayitNo = line.KayitNo, Miktar = 1 }, new() { DetayKayitNo = 999999, Miktar = 1 }]
+        }, Admin));
+        Assert.Equal(2m, Assert.Single(repository.Receipt(12)!.Detaylar).Miktar);
+        Assert.Equal(receipt.GenelToplam, repository.Receipt(12)!.GenelToplam);
+        Assert.Null(repository.Receipt(11));
+        Assert.Throws<ApiException>(() => repository.Split(new()
+        {
+            MasaKayitNo = 12, HedefMasaKayitNo = 11,
+            AyrilanSatirlar = [new() { DetayKayitNo = line.KayitNo, Miktar = 2 }]
+        }, Admin));
+        Assert.Equal(2m, Assert.Single(repository.Receipt(12)!.Detaylar).Miktar);
     }
 
     [Fact]

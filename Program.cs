@@ -127,6 +127,17 @@ api.MapGet("/auth/session", (ClaimsPrincipal user) => Results.Ok(ApiResult.Ok(ne
     Rol = user.FindFirstValue(ClaimTypes.Role)!
 })));
 api.MapGet("/menu", (RestaurantRepository repository) => Results.Ok(ApiResult<List<MenuKategoriDTO>>.Ok(repository.Menu()))).AllowAnonymous();
+api.MapGet("/paket-siparisler", (ClaimsPrincipal user, RestaurantRepository repository) =>
+    Results.Ok(ApiResult<List<PaketSiparisDTO>>.Ok(repository.Deliveries(Actor(user)))))
+    .RequireAuthorization("Orders");
+api.MapPost("/paket-siparisler", (PaketSiparisEkleRequest request, ClaimsPrincipal user,
+    RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+    Mutate(() => repository.CreateDelivery(request, Actor(user)), hub, logs))
+    .RequireAuthorization("Orders");
+api.MapPatch("/paket-siparisler/{id:long}/durum", (long id, PaketDurumRequest request, ClaimsPrincipal user,
+    RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+    Mutate(() => repository.UpdateDelivery(id, request, Actor(user)), hub, logs))
+    .RequireAuthorization("Orders");
 api.MapGet("/bolumler", (RestaurantRepository repository) => Results.Ok(ApiResult<List<RestorantBolumDTO>>.Ok(repository.Sections())));
 api.MapGet("/masalar", (long? bolumId, RestaurantRepository repository) =>
     Results.Ok(ApiResult<List<RestorantMasaDTO>>.Ok(repository.Tables(bolumId))));

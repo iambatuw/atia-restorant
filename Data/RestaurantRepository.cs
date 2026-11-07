@@ -28,11 +28,13 @@ public sealed class RestaurantRepository
     private readonly List<MenuKategoriDTO> _menu = [];
     private readonly List<AdisyonBaslikDTO> _receipts = [];
     private readonly List<RezervasyonDTO> _reservations = [];
+    private readonly List<PaketSiparisDTO> _deliveries = [];
+    private readonly Dictionary<string, long> _deliveryIdempotency = [];
     private readonly Dictionary<long, decimal> _ready = [];
     private readonly Dictionary<long, DateTime> _closedAt = [];
     private readonly Dictionary<string, PosIslemKayitDTO> _posTransactions = [];
     private readonly Dictionary<string, string> _posIdempotency = [];
-    private long _nextReceipt = 1000, _nextLine = 10000, _nextReservation = 100;
+    private long _nextReceipt = 1000, _nextLine = 10000, _nextReservation = 100, _nextDelivery = 3000;
     private DateTime Now => _clock.GetUtcNow().UtcDateTime;
     private static readonly TimeZoneInfo RestaurantTimeZone = FindRestaurantTimeZone();
     private static TimeZoneInfo FindRestaurantTimeZone()
@@ -119,6 +121,72 @@ public sealed class RestaurantRepository
         new RestorantBolumDTO { KayitNo = g.Key!.Value, BolumKodu = g.First().RestorantBolumKodu,
             BolumAdi = g.First().RestorantBolumAdi, ToplamMasa = g.Count(), DoluMasa = g.Count(t => Open(t.MasaId) is not null) }).ToList());
     public List<MenuKategoriDTO> Menu() => Read(() => _menu);
+    public List<PaketSiparisDTO> Deliveries(StaffActor actor) => Read(() =>
+    {
+        Staff(actor, "Garson", "Admin");
+        return _deliveries.OrderByDescending(d => d.KayitTarihi).ToList();
+    });
+
+    public PaketSiparisDTO CreateDelivery(PaketSiparisEkleRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Garson", "Admin");
+        Require(Guid.TryParse(request.IdempotencyKey, out _), "İşlem anahtarı geçersiz.");
+        if (_deliveryIdempotency.TryGetValue(request.IdempotencyKey, out var existingId))
+            return _deliveries.Single(d => d.KayitNo == existingId);
+        Require(!string.IsNullOrWhiteSpace(request.MusteriAdi) && request.MusteriAdi.Trim().Length <= 100,
+            "Müşteri adı 1–100 karakter olmalı.");
+        Require(!string.IsNullOrWhiteSpace(request.Telefon) && request.Telefon.Trim().Length <= 30,
+            "Telefon 1–30 karakter olmalı.");
+        Require(!string.IsNullOrWhiteSpace(request.Adres) && request.Adres.Trim().Length <= 300,
+            "Adres 1–300 karakter olmalı.");
+        Note(request.Aciklama);
+        Require(request.OdemeSekli is "Nakit" or "Kart" or "Online", "Ödeme şekli geçersiz.");
+        Require(request.Satirlar is { Count: > 0 and <= 50 }, "En az bir, en fazla 50 ürün seçilmeli.");
+
+        var lines = new List<PaketSiparisSatirDTO>();
+        foreach (var row in request.Satirlar)
+        {
+            Require(row.Miktar is >= 1 and <= 50, "Ürün miktarı 1–50 arasında olmalı.");
+            var product = _menu.SelectMany(c => c.Urunler)
+                .FirstOrDefault(p => p.KayitNo == row.StokKayitNo && p.Aktif)
+                ?? throw new ApiException(404, "Aktif ürün bulunamadı.");
+            var portion = row.PorsiyonKayitNo.HasValue
+                ? product.Porsiyonlar.FirstOrDefault(p => p.KayitNo == row.PorsiyonKayitNo) : null;
+            Require(!row.PorsiyonKayitNo.HasValue || portion is not null, "Ürüne ait porsiyon bulunamadı.");
+            var price = portion?.Fiyat ?? product.SatisFiyati;
+            lines.Add(new PaketSiparisSatirDTO { StokKayitNo = product.KayitNo, StokAdi = product.StokAdi ?? "",
+                PorsiyonKayitNo = portion?.KayitNo, PorsiyonAdi = portion?.PorsiyonAdi, Miktar = row.Miktar,
+                BirimFiyat = price, SatirTutari = decimal.Round(price * row.Miktar, 2, MidpointRounding.AwayFromZero) });
+        }
+        var delivery = new PaketSiparisDTO { KayitNo = ++_nextDelivery, KayitTarihi = Now,
+            MusteriAdi = request.MusteriAdi.Trim(), Telefon = request.Telefon.Trim(), Adres = request.Adres.Trim(),
+            Aciklama = request.Aciklama?.Trim(), OdemeSekli = request.OdemeSekli, Durum = PaketDurum.Yeni,
+            GenelToplam = lines.Sum(l => l.SatirTutari), Satirlar = lines };
+        _deliveries.Add(delivery);
+        _deliveryIdempotency[request.IdempotencyKey] = delivery.KayitNo;
+        return delivery;
+    });
+
+    public PaketSiparisDTO UpdateDelivery(long id, PaketDurumRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Garson", "Admin");
+        var delivery = _deliveries.FirstOrDefault(d => d.KayitNo == id)
+            ?? throw new ApiException(404, "Paket siparişi bulunamadı.");
+        var allowed = delivery.Durum switch
+        {
+            PaketDurum.Yeni => request.Durum is PaketDurum.Hazirlaniyor or PaketDurum.Iptal,
+            PaketDurum.Hazirlaniyor => request.Durum is PaketDurum.Yolda or PaketDurum.Iptal,
+            PaketDurum.Yolda => request.Durum == PaketDurum.TeslimEdildi,
+            _ => false
+        };
+        Require(allowed, "Bu durum geçişi yapılamaz.", 409);
+        if (request.Durum == PaketDurum.Yolda)
+            Require(!string.IsNullOrWhiteSpace(request.Kurye) && request.Kurye.Trim().Length <= 100,
+                "Kurye adı 1–100 karakter olmalı.");
+        delivery.Durum = request.Durum;
+        if (request.Durum == PaketDurum.Yolda) delivery.Kurye = request.Kurye!.Trim();
+        return delivery;
+    });
     public AdisyonBaslikDTO? Receipt(long tableId) => Read(() => { Table(tableId); return Open(tableId); });
 
     public AdisyonBaslikDTO AddOrder(SiparisEkleRequest request, StaffActor actor) => Change(() =>
@@ -265,6 +333,18 @@ public sealed class RestaurantRepository
         Require(Open(targetTable.MasaId) is null && !Reserved(targetTable.MasaId),
             "Hedef masa boş ve rezervasyonsuz olmalı.", 409);
         Require(request.AyrilanSatirlar is { Count: > 0 }, "Ayrılacak en az bir sipariş satırı seçilmelidir.");
+
+        Require(request.AyrilanSatirlar.Select(item => item.DetayKayitNo).Distinct().Count() == request.AyrilanSatirlar.Count,
+            "Aynı sipariş satırı birden fazla kez seçilemez.");
+        foreach (var item in request.AyrilanSatirlar)
+        {
+            Quantity(item.Miktar);
+            var line = sourceReceipt.Detaylar.FirstOrDefault(d => d.KayitNo == item.DetayKayitNo)
+                ?? throw new ApiException(404, $"Satır bulunamadı (No: {item.DetayKayitNo}).");
+            Require(item.Miktar <= line.Miktar, $"{line.StokAdi} için ayrılacak miktar mevcut miktardan fazla olamaz.");
+        }
+        Require(request.AyrilanSatirlar.Sum(item => item.Miktar) < sourceReceipt.Detaylar.Sum(line => line.Miktar),
+            "Tüm siparişler ayrılamaz; bunun yerine masa taşıma işlemini kullanın.", 400);
 
         var targetReceipt = new AdisyonBaslikDTO
         {

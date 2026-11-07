@@ -6,6 +6,11 @@ import {
   ChefHat,
   BookOpen,
   ChartNoAxesCombined,
+  LayoutDashboard,
+  PlugZap,
+  CalendarDays,
+  MoreHorizontal,
+  Truck,
   LogOut,
   RefreshCw,
   ArrowUpRight,
@@ -19,20 +24,34 @@ import {LoginPage} from './LoginPage';
 import {Tables} from './Tables';
 import {MenuPage} from './MenuPage';
 import {Kitchen} from './Kitchen';
+import {Overview} from './Overview';
+import {Integrations} from './Integrations';
+import {DeliveryPage} from './DeliveryPage';
+import './Operations.css';
+import {canAccess,defaultPage,pageFromPath,pagePath} from './routes';
+import type {Page} from './routes';
 
 const Management=lazy(()=>import('./Management'));
-type Page='masalar'|'mutfak'|'menu'|'raporlar'|'rezervasyonlar';
-
 export default function App(){
-  const publicMenu=location.pathname==='/menu';
+  const [path,setPath]=useState(()=>location.pathname);
+  const publicMenu=path.replace(/\/$/,'')==='/menu';
+  const navigate=useCallback((next:string,replace=false)=>{
+    if(location.pathname!==next) window.history[replace?'replaceState':'pushState'](null,'',next);
+    setPath(next);
+  },[]);
+  useEffect(()=>{
+    const onPop=()=>setPath(location.pathname);
+    window.addEventListener('popstate',onPop);
+    return ()=>window.removeEventListener('popstate',onPop);
+  },[]);
   const [session,setSession]=useState<Session|null>(null);
   const [candidate] = useState(()=>publicMenu ? null : readSessionToken());
   const [restoring,setRestoring]=useState(!!candidate);
   const [restoreError,setRestoreError]=useState(false);
   const [retryRestore,setRetryRestore]=useState(0);
   const generation=useRef(0);
-  const [page,setPage]=useState<Page>('masalar');
   const [currentTime,setCurrentTime]=useState(getFormattedTime());
+  const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const client=useQueryClient();
 
   useEffect(()=>{
@@ -48,7 +67,8 @@ export default function App(){
     setRestoring(false);
     setRestoreError(false);
     client.clear();
-  },[client]);
+    navigate('/login',true);
+  },[client,navigate]);
 
   useEffect(()=>{
     window.addEventListener('auth-expired',logout);
@@ -65,7 +85,6 @@ export default function App(){
       if (cancelled || generation.current!==current) return;
       if (!identity || !['Admin','Garson','Mutfak'].includes(identity.Rol) || !identity.TamAd || !identity.KullaniciId) throw new Error('Oturum bilgisi geçersiz.');
       setSession({...identity,Token:candidate,KullaniciAdi:''});
-      setPage(identity.Rol==='Mutfak'?'mutfak':'masalar');
       setRestoring(false);
     }).catch(error=>{
       if (cancelled || generation.current!==current) return;
@@ -81,6 +100,16 @@ export default function App(){
     retry:false
   });
 
+  const requested=pageFromPath(path);
+  useEffect(()=>{
+    if(publicMenu||restoring) return;
+    if(!session){
+      if(path==='/') navigate('/login',true);
+      return;
+    }
+    if(!requested||!canAccess(requested,session.Rol)) navigate(pagePath(defaultPage(session.Rol)),true);
+  },[publicMenu,restoring,session,requested,path,navigate]);
+
   if(publicMenu) {
     return (
       <div className="public-menu-shell">
@@ -88,17 +117,12 @@ export default function App(){
           <Brand isPublic/>
           <div className="customer-head-actions">
             <ThemeToggle/>
-            <a href="/" className="staff-portal-btn">
+            <a href="/login" className="staff-portal-btn">
               <span>Personel Girişi</span>
               <ArrowUpRight size={15}/>
             </a>
           </div>
         </header>
-
-        <div className="customer-hero">
-          <h1>Menü</h1>
-          <p>Güncel ürünleri ve fiyatları inceleyin.</p>
-        </div>
 
         <MenuPage publicView/>
       </div>
@@ -120,7 +144,7 @@ export default function App(){
           saveSessionToken(s.Token);
           setToken(s.Token);
           setSession(s);
-          setPage(s.Rol==='Mutfak'?'mutfak':'masalar');
+          navigate(pagePath(requested&&canAccess(requested,s.Rol)?requested:defaultPage(s.Rol)),true);
           client.clear();
         }}
       />
@@ -128,77 +152,51 @@ export default function App(){
   }
 
   const nav=[
+    {id:'genel-bakis',label:'Genel bakış',icon:LayoutDashboard,allowed:session.Rol==='Admin'},
     {id:'masalar',label:'Masalar',icon:Armchair,allowed:session.Rol!=='Mutfak'},
+    {id:'paket-servis',label:'Paket servis',icon:Truck,allowed:session.Rol!=='Mutfak'},
     {id:'mutfak',label:'Mutfak',icon:ChefHat,allowed:session.Rol!=='Garson'},
     {id:'menu',label:'Menü',icon:BookOpen,allowed:true},
-    {id:'raporlar',label:'Günlük rapor',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'}
+    {id:'raporlar',label:'Günlük rapor',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
+    {id:'entegrasyonlar',label:'Entegrasyonlar',icon:PlugZap,allowed:session.Rol==='Admin'},
+    {id:'rezervasyonlar',label:'Rezervasyonlar',icon:CalendarDays,allowed:session.Rol==='Admin'}
   ];
+  const page:Page=requested&&canAccess(requested,session.Rol)?requested:defaultPage(session.Rol);
   const current=nav.find(n=>n.id===page)!;
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <Brand/>
-        <nav aria-label="Ana menü" className="sidebar-nav">
+    <div className="op-app">
+      <aside className="op-sidebar">
+        <div className="op-brand"><strong>ATIA</strong><span>Restoran</span></div>
+        <p className="op-nav-label">Çalışma alanı</p>
+        <nav aria-label="Ana menü" className="op-nav">
           {nav.filter(n=>n.allowed).map(n=>(
-            <button
+            <a
               key={n.id}
+              href={pagePath(n.id as Page)}
               aria-current={page===n.id?'page':undefined}
-              className={`nav-item ${page===n.id?'active':''}`}
-              onClick={()=>setPage(n.id as Page)}
+              className={`op-nav-item ${page===n.id?'active':''} ${n.id==='rezervasyonlar'?'op-nav-secondary':''}`}
+              onClick={e=>{if(e.button===0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey){e.preventDefault();setMobileMenuOpen(false);navigate(pagePath(n.id as Page));}}}
             >
-              <n.icon size={19} className="nav-icon"/>
-              <span className="nav-label">{n.label}</span>
-              {page===n.id&&<span className="active-glow-indicator" aria-hidden="true"/>}
-            </button>
+              <n.icon size={19}/>
+              <span>{n.label}</span>
+            </a>
           ))}
         </nav>
-
-        <a className="qr-menu-callout" href="/menu" target="_blank" rel="noreferrer">
-          <div className="callout-icon">
-            <BookOpen size={18}/>
-          </div>
-          <div className="callout-text">
-            <strong>Müşteri Menüsü</strong>
-            <small>Menüyü görüntüle</small>
-          </div>
-          <ArrowUpRight size={15} className="callout-arrow"/>
-        </a>
-
-        <div className="sidebar-bottom">
-          <div className="user-profile-badge">
-            <div className="avatar-monogram">{session.TamAd.slice(0,1)}</div>
-            <div className="user-details">
-              <strong>{session.TamAd}</strong>
-              <span className="role-tag">{session.Rol==='Admin'?'Yönetici':session.Rol}</span>
-            </div>
-            <button
-              onClick={logout}
-              aria-label="Oturumu kapat"
-              title="Çıkış yap"
-              className="logout-action-btn"
-            >
-              <LogOut size={17}/>
-            </button>
-          </div>
+        <div className="op-sidebar-bottom">
+          <a className="op-public-link" href="/menu" target="_blank" rel="noreferrer"><BookOpen size={17}/> Müşteri menüsü <ArrowUpRight size={15}/></a>
+          <div className="op-user"><span className="op-avatar">{session.TamAd.slice(0,1)}</span><div><strong>{session.TamAd}</strong><small>{session.Rol==='Admin'?'Yönetici':session.Rol}</small></div><button onClick={logout} aria-label="Oturumu kapat" title="Çıkış yap"><LogOut size={17}/></button></div>
         </div>
       </aside>
 
-      <div className="workspace">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <span className="bread-root">Atia Operasyon</span>
-            <span className="bread-sep">/</span>
-            <strong className="bread-current">{current.label}</strong>
-          </div>
-
-          <div className="topbar-tools">
-            <div className="topbar-clock" title="Sistem Saati">
-              <Clock size={14}/>
-              <span>{currentTime}</span>
-            </div>
+      <div className="op-workspace">
+        <header className="op-topbar">
+          <div className="op-location"><span>ATIA / Operasyon</span><strong>{current.label}</strong></div>
+          <div className="op-topbar-tools">
+            <span className="op-clock"><Clock size={15}/>{currentTime}</span>
             <Realtime token={session.Token}/>
             <ThemeToggle/>
+            <button className="icon-button op-more-button" aria-label="Tüm ekranlar" aria-expanded={mobileMenuOpen} onClick={()=>setMobileMenuOpen(open=>!open)}><MoreHorizontal size={19}/></button>
             <button
               className="icon-button"
               aria-label="Verileri yenile"
@@ -208,7 +206,7 @@ export default function App(){
               <RefreshCw size={17}/>
             </button>
             <button
-              className="icon-button mobile-logout"
+              className="icon-button op-mobile-logout"
               aria-label="Oturumu kapat"
               onClick={logout}
             >
@@ -216,24 +214,30 @@ export default function App(){
             </button>
           </div>
         </header>
+        {mobileMenuOpen&&<nav className="op-mobile-menu" aria-label="Tüm ekranlar menüsü">{nav.filter(n=>n.allowed).map(n=><a key={n.id} href={pagePath(n.id as Page)} aria-current={page===n.id?'page':undefined} onClick={e=>{if(e.button===0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey){e.preventDefault();setMobileMenuOpen(false);navigate(pagePath(n.id as Page));}}}><n.icon size={17}/>{n.label}</a>)}</nav>}
 
         {health.data?.Mode==='Demo'&&(
-          <div className="demo-notice-bar">
-            <span className="demo-dot"/>
-            <span><strong>Demo Modu Aktif:</strong> Örnek restoran verileriyle çalışıyorsunuz. Değişiklikler sunucu yeniden başlatılınca sıfırlanır.</span>
+          <div className="op-demo-notice" role="status">
+            <strong>Demo veri</strong><span>İşlemler sunucu yeniden başlatıldığında sıfırlanır.</span>
           </div>
         )}
 
-        <main className="main-viewport">
+        <main className="op-main" id="ana-icerik">
           <Suspense fallback={<Loading/>}>
-            {page==='masalar'?(
+            {page==='genel-bakis'?(
+              <Overview navigate={p=>navigate(pagePath(p))}/>
+            ):page==='masalar'?(
               <Tables session={session}/>
+            ):page==='paket-servis'?(
+              <DeliveryPage/>
             ):page==='mutfak'?(
               <Kitchen/>
             ):page==='menu'?(
               <MenuPage/>
+            ):page==='entegrasyonlar'?(
+              <Integrations navigate={p=>navigate(pagePath(p))}/>
             ):(
-              <Management page={page}/>
+              <Management page={page as 'raporlar'|'rezervasyonlar'}/>
             )}
           </Suspense>
         </main>
@@ -248,7 +252,7 @@ function Brand({isPublic=false}:{isPublic?:boolean}){
     <div className={`brand-wrapper ${isPublic?'public':''}`}>
       <div className="brand-text-block">
         <span className="brand-primary">ATIA</span>
-        <span className="brand-secondary">Restorant</span>
+        <span className="brand-secondary">Restoran</span>
       </div>
     </div>
   );

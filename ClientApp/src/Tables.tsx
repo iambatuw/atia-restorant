@@ -4,12 +4,10 @@ import {
   Armchair,
   ArrowLeft,
   ArrowRight,
-  Clock3,
   Plus,
   Minus,
   Trash2,
   ReceiptText,
-  Users,
   Search,
   X,
   Split,
@@ -51,94 +49,38 @@ export function Tables({session}:{session:Session}){
     (status==='all'||(status==='busy'?!!t.BaslikKayitNo:status==='reserved'?t.Rezerve:!t.BaslikKayitNo&&!t.Rezerve))&&
     t.MasaAdi.toLocaleLowerCase('tr').includes(search.toLocaleLowerCase('tr'))
   );
+  const occupied=tables.data?.filter(t=>!!t.BaslikKayitNo).length??0;
+  const available=tables.data?.filter(t=>!t.BaslikKayitNo&&!t.Rezerve).length??0;
 
   return (
-    <>
-      <div className="page-heading">
-        <div>
-          <h1>Masa planı</h1>
-          <p>Bir masa seçerek siparişleri görüntüleyin.</p>
-        </div>
-        <div className="date-label">
-          {new Intl.DateTimeFormat('tr-TR',{weekday:'long',day:'numeric',month:'long'}).format(new Date())}
-        </div>
-      </div>
-      <div className={`floor-layout ${table?'has-selection':''}`}>
-        <section className="floor">
-          <div className="floor-toolbar">
-            <div className="tabs">
-              <button className={section===null?'selected':''} onClick={()=>setSection(null)}>
-                Tüm bölümler <span>{tables.data?.length??'—'}</span>
-              </button>
-              {sections.data?.map(s=>(
-                <button key={s.KayitNo} className={section===s.KayitNo?'selected':''} onClick={()=>setSection(s.KayitNo)}>
-                  {s.BolumAdi} <span>{s.ToplamMasa}</span>
-                </button>
-              ))}
+    <section className="op-page op-floor-page" aria-label="Masalar">
+      <header className="op-page-head"><div><h1>Masalar</h1><p>Salonun anlık durumu ve açık adisyonlar</p></div><div className="op-head-count"><strong>{occupied}</strong><span>dolu</span><strong>{available}</strong><span>boş</span></div></header>
+      <div className={`op-floor-layout ${table?'has-selection':''}`}>
+        <section className="op-floor">
+          <div className="op-floor-tools">
+            <div className="op-sections" role="group" aria-label="Bölümler">
+              <button aria-pressed={section===null} onClick={()=>setSection(null)}>Tüm bölümler <span>{tables.data?.length??0}</span></button>
+              {sections.data?.map(s=><button key={s.KayitNo} aria-pressed={section===s.KayitNo} onClick={()=>setSection(s.KayitNo)}>{s.BolumAdi} <span>{s.ToplamMasa}</span></button>)}
             </div>
-          </div>
-          <div className="floor-filter">
-            <div className="status-filters" aria-label="Masa durumları">
-              {[['all','Tümü'],['busy','Dolu'],['free','Boş'],['reserved','Rezerve']].map(([id,label])=>(
-                <button key={id} aria-pressed={status===id} className={status===id?'current':''} onClick={()=>setStatus(id)}>
-                  <i className={`dot ${id}`}/>{label}
-                </button>
-              ))}
-            </div>
-            <div className="search compact">
-              <Search size={16}/>
-              <input placeholder="Masa ara…" aria-label="Masa ara" value={search} onChange={e=>setSearch(e.target.value)}/>
-            </div>
+            <div className="op-floor-filters"><div className="op-filter-set" role="group" aria-label="Masa durumu">
+              {[['all','Tümü'],['busy','Dolu'],['free','Boş'],['reserved','Rezerve']].map(([id,label])=><button key={id} aria-pressed={status===id} onClick={()=>setStatus(id)}>{label}</button>)}
+            </div><label className="op-search"><Search size={17}/><input type="search" placeholder="Masa ara" aria-label="Masa ara" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>
           </div>
           <ErrorBox error={tables.error||sections.error} retry={()=>{void tables.refetch();void sections.refetch();}}/>
           {tables.isPending?<Loading/>:visible.length===0?<Empty>Bu filtreye uygun masa yok.</Empty>:(
-            <div className="table-grid">
+            <div className="op-table-grid">
               {visible.map(t=>{
                 const mins=minutes(t.AcilisTarihi);
-                const timerLevel=mins>=60?'late':mins>=30?'warm':'calm';
                 return (
                   <button
-                    className={`table-card ${t.BaslikKayitNo?'occupied':t.Rezerve?'reserved':'free'} ${selected===t.MasaId?'picked':''}`}
+                    className={`op-table ${t.BaslikKayitNo?'occupied':t.Rezerve?'reserved':'free'}`}
                     key={t.MasaId}
                     onClick={()=>setSelected(t.MasaId)}
                     aria-pressed={selected===t.MasaId}
                   >
-                    <div className="table-card-top">
-                      <span className={`status-chip ${t.BaslikKayitNo?'occupied':t.Rezerve?'reserved':'free'}`}>
-                        <span className="chip-dot"/>
-                        {t.BaslikKayitNo?'Dolu':t.Rezerve?'Rezerve':'Boş'}
-                      </span>
-                      {t.BaslikKayitNo&&(
-                        <span className={`timer-chip ${timerLevel}`}>
-                          <Clock3 size={12}/>
-                          <span>{mins} dk</span>
-                        </span>
-                      )}
-                    </div>
-                    <div className="table-card-center">
-                      <div className="table-glyph">
-                        <Armchair size={26} strokeWidth={1.5}/>
-                      </div>
-                      <div className="table-name-block">
-                        <h2 className="table-title">{t.MasaAdi}</h2>
-                        <span className="table-section-tag">{t.RestorantBolumAdi}</span>
-                      </div>
-                    </div>
-                    <div className="table-card-bottom">
-                      {t.BaslikKayitNo?(
-                        <>
-                          <span className="guests-info">
-                            {t.KisiSayisi > 0 && <><Users size={13}/> {t.KisiSayisi} Kişi</>}
-                          </span>
-                          <strong className="bill-amount">{money(t.Tutar)}</strong>
-                        </>
-                      ):(
-                        <>
-                          <span className="open-cue">{t.Rezerve?'Rezervasyon Var':'Adisyon Aç'}</span>
-                          <span className="plus-glyph"><Plus size={16}/></span>
-                        </>
-                      )}
-                    </div>
+                    <span className="op-table-top"><span>{t.RestorantBolumAdi}</span><span className="op-table-status">{t.BaslikKayitNo?'Dolu':t.Rezerve?'Rezerve':'Boş'}</span></span>
+                    <strong className="op-table-name">{t.MasaAdi}</strong>
+                    <span className="op-table-bottom"><span>{t.BaslikKayitNo?`${t.KisiSayisi} kişi · ${mins} dk`:t.Rezerve?'Rezervasyonlu':'Adisyon açılabilir'}</span><b>{t.BaslikKayitNo?money(t.Tutar):'—'}</b></span>
                   </button>
                 );
               })}
@@ -148,16 +90,10 @@ export function Tables({session}:{session:Session}){
         {table?(
           <TableOrder key={table.MasaId} table={table} admin={session.Rol==='Admin'} allTables={tables.data??[]} close={()=>setSelected(null)}/>
         ):(
-          <aside className="order-placeholder">
-            <div className="placeholder-icon-wrap">
-              <ReceiptText size={38} strokeWidth={1.3}/>
-            </div>
-            <h2>Bir masa seçin</h2>
-            <p>Siparişler ve hesap burada görünür.</p>
-          </aside>
+          <aside className="op-check-placeholder"><ReceiptText size={28}/><h2>Adisyon</h2><p>Siparişleri görmek veya yeni adisyon açmak için bir masa seçin.</p></aside>
         )}
       </div>
-    </>
+    </section>
   );
 }
 
@@ -221,27 +157,15 @@ function TableOrder({table,admin,allTables,close}:{table:Table;admin:boolean;all
   };
 
   return (
-    <aside className="order-panel guest-check-panel">
-      <div className="order-heading">
-        <div className="order-heading-title">
-          <span className="order-section-badge">{table.RestorantBolumAdi}</span>
+    <aside className="order-panel guest-check-panel fresh-check">
+      <header className="fresh-check-heading">
+        <div>
+          <p>{table.RestorantBolumAdi}</p>
           <h2>{table.MasaAdi}</h2>
+          <span>{order?`Adisyon #${order.KayitNo}`:'Yeni adisyon'}{table.AcilisTarihi?` · ${minutes(table.AcilisTarihi)} dk`:''}</span>
         </div>
-        <button className="icon-button" onClick={close} aria-label="Adisyon panelini kapat">
-          <X size={18}/>
-        </button>
-      </div>
-
-      <div className="receipt-meta-bar">
-        <div className="meta-left">
-          <ReceiptText size={14}/>
-          <span>{order?`Adisyon #${order.KayitNo}`:'Yeni Masa Açık'}</span>
-        </div>
-        <div className="meta-right">
-          <Clock3 size={14}/>
-          <span>{minutes(table.AcilisTarihi)} dk açık</span>
-        </div>
-      </div>
+        <button className="icon-button" onClick={close} aria-label="Adisyon panelini kapat"><X size={18}/></button>
+      </header>
 
       <ErrorBox error={receipt.error||mutation.error} retry={()=>void receipt.refetch()}/>
 

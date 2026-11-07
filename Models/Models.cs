@@ -228,6 +228,58 @@ public class PorsiyonDTO
     public decimal Fiyat { get; set; }
 }
 
+public enum PaketDurum { Yeni, Hazirlaniyor, Yolda, TeslimEdildi, Iptal }
+
+public class PaketSiparisSatirDTO
+{
+    public long StokKayitNo { get; set; }
+    public string StokAdi { get; set; } = "";
+    public int? PorsiyonKayitNo { get; set; }
+    public string? PorsiyonAdi { get; set; }
+    public int Miktar { get; set; }
+    public decimal BirimFiyat { get; set; }
+    public decimal SatirTutari { get; set; }
+}
+
+public class PaketSiparisDTO
+{
+    public long KayitNo { get; set; }
+    public DateTime KayitTarihi { get; set; }
+    public string MusteriAdi { get; set; } = "";
+    public string Telefon { get; set; } = "";
+    public string Adres { get; set; } = "";
+    public string? Aciklama { get; set; }
+    public string OdemeSekli { get; set; } = "Nakit";
+    public string? Kurye { get; set; }
+    public PaketDurum Durum { get; set; }
+    public decimal GenelToplam { get; set; }
+    public List<PaketSiparisSatirDTO> Satirlar { get; set; } = new();
+}
+
+public class PaketSiparisSatirIstek
+{
+    public long StokKayitNo { get; set; }
+    public int? PorsiyonKayitNo { get; set; }
+    public int Miktar { get; set; }
+}
+
+public class PaketSiparisEkleRequest
+{
+    public string IdempotencyKey { get; set; } = "";
+    public string MusteriAdi { get; set; } = "";
+    public string Telefon { get; set; } = "";
+    public string Adres { get; set; } = "";
+    public string? Aciklama { get; set; }
+    public string OdemeSekli { get; set; } = "Nakit";
+    public List<PaketSiparisSatirIstek> Satirlar { get; set; } = new();
+}
+
+public class PaketDurumRequest
+{
+    public PaketDurum Durum { get; set; }
+    public string? Kurye { get; set; }
+}
+
 // ───── MUTFAK (KDS) ─────
 public class MutfakSiparisDTO
 {
