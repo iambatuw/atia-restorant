@@ -8,15 +8,6 @@ Install/use a .NET 10 SDK, then from this API directory:
 
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
-foreach ($role in 'Waiter','Kitchen') {
-    $bytes = New-Object byte[] 24
-    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-    $rng.GetBytes($bytes)
-    $rng.Dispose()
-    $password = [Convert]::ToBase64String($bytes)
-    Set-Item -Path "Env:Demo__$($role)Password" -Value $password
-    Write-Host "$role password: $password"
-}
 dotnet restore --source https://api.nuget.org/v3/index.json
 dotnet run --no-launch-profile --urls http://0.0.0.0:5000
 ```
@@ -35,10 +26,10 @@ Tests cover parallel orders and payments, snapshot isolation, authoritative pric
 | KullaniciAdi | Password | Rol |
 | --- | --- | --- |
 | admin | `demo123` | Admin |
-| garson | `Demo__WaiterPassword` | Garson |
-| mutfak | `Demo__KitchenPassword` | Mutfak |
+| garson | `demo123` | Garson |
+| mutfak | `demo123` | Mutfak |
 
-The demo admin password is fixed at `demo123`. Waiter and kitchen need distinct 12–128 character passwords supplied at startup; neither may equal the admin password. The command above creates and prints random values for them. Missing, short or duplicate values prevent startup. Login is limited to 10 attempts per minute per direct remote IP, with HTTP 429 thereafter. Anyone who can reach this demo and knows the published admin password can sign in as Admin; limit network access and do not use real business data. Do not enable untrusted forwarded headers; configure trusted proxy handling separately if needed.
+All three demo accounts use `demo123`. Login is limited to 10 attempts per minute per direct remote IP, with HTTP 429 thereafter. Anyone who can reach this demo and knows the published credentials can sign in; limit network access and do not use real business data. Do not enable untrusted forwarded headers; configure trusted proxy handling separately if needed.
 
 ### Non-demo / production
 

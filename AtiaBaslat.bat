@@ -10,13 +10,11 @@ if errorlevel 1 (
 )
 
 set "ASPNETCORE_ENVIRONMENT=Development"
-for /f "delims=" %%P in ('powershell.exe -NoProfile -Command "$bytes = New-Object byte[] 24; $rng = [Security.Cryptography.RandomNumberGenerator]::Create(); $rng.GetBytes($bytes); $rng.Dispose(); [Convert]::ToBase64String($bytes)"') do set "Demo__WaiterPassword=%%P"
-for /f "delims=" %%P in ('powershell.exe -NoProfile -Command "$bytes = New-Object byte[] 24; $rng = [Security.Cryptography.RandomNumberGenerator]::Create(); $rng.GetBytes($bytes); $rng.Dispose(); [Convert]::ToBase64String($bytes)"') do set "Demo__KitchenPassword=%%P"
 
 echo Atia Restoran baslatiliyor...
 echo Yonetici: admin / demo123
-echo Garson parolasi: %Demo__WaiterPassword%
-echo Mutfak parolasi: %Demo__KitchenPassword%
+echo Garson: garson / demo123
+echo Mutfak: mutfak / demo123
 echo.
 echo Diger bilgisayarlardan sunucunun IP adresi ve 5080 portuyla baglanabilirsiniz.
 echo Kapatmak icin bu pencerede Ctrl+C kullanin.

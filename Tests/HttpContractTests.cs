@@ -22,30 +22,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     private readonly IPAddress _remoteAddress;
     public ApiFactory(IPAddress? remoteAddress = null) => _remoteAddress = remoteAddress ?? IPAddress.Loopback;
-    protected override IHost CreateHost(IHostBuilder builder)
-    {
-        var keys = new[] { "Demo__WaiterPassword", "Demo__KitchenPassword" };
-        var previous = keys.Select(Environment.GetEnvironmentVariable).ToArray();
-        try
-        {
-            Environment.SetEnvironmentVariable(keys[0], "waiter-test-password-12");
-            Environment.SetEnvironmentVariable(keys[1], "kitchen-test-password-12");
-            return base.CreateHost(builder);
-        }
-        finally
-        {
-            for (var i = 0; i < keys.Length; i++) Environment.SetEnvironmentVariable(keys[i], previous[i]);
-        }
-    }
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
         builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(new TestRemoteAddressFilter(_remoteAddress)));
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Demo:Enabled"] = "true", ["JwtSettings:SecretKey"] = "test-only-generated-config-key-32-bytes-minimum",
-            ["Demo:WaiterPassword"] = "waiter-test-password-12",
-            ["Demo:KitchenPassword"] = "kitchen-test-password-12"
+            ["Demo:Enabled"] = "true", ["JwtSettings:SecretKey"] = "test-only-generated-config-key-32-bytes-minimum"
         }));
     }
 }
@@ -68,9 +51,7 @@ public sealed class HttpContractTests
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = false };
     private static async Task Login(HttpClient client, string username)
     {
-        var password = username switch { "admin" => "demo123", "garson" => "waiter-test-password-12",
-            "mutfak" => "kitchen-test-password-12", _ => throw new ArgumentException("Unknown test account") };
-        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { KullaniciAdi = username, Sifre = password });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { KullaniciAdi = username, Sifre = "demo123" });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<ApiResult<LoginResponse>>(Json);
         Assert.NotNull(result?.Data);
@@ -99,7 +80,7 @@ public sealed class HttpContractTests
         using var factory = new ApiFactory();
         using var client = factory.CreateClient();
         var login = await client.PostAsJsonAsync("/api/auth/login", new
-            { KullaniciAdi = "garson", Sifre = "waiter-test-password-12", Rol = "Admin" });
+            { KullaniciAdi = "garson", Sifre = "demo123", Rol = "Admin" });
         var data = await login.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("Garson", data.GetProperty("Data").GetProperty("Rol").GetString());
         var token = data.GetProperty("Data").GetProperty("Token").GetString()!;
@@ -111,7 +92,7 @@ public sealed class HttpContractTests
             $"{parts[0]}.{WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(payload))}.{parts[2]}");
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/raporlar/gunluk")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/auth/login",
-            new LoginRequest { KullaniciAdi = "admin", Sifre = "waiter-test-password-12" })).StatusCode);
+            new LoginRequest { KullaniciAdi = "admin", Sifre = "wrong" })).StatusCode);
     }
 
     [Fact]
@@ -296,11 +277,10 @@ public sealed class HttpContractTests
         var valid = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
             ["JwtSettings:SecretKey"] = "production-test-configuration-at-least-32-bytes" }).Build();
         var config = JwtConfiguration.Load(valid, production, new(false));
-        var auth = new AuthService(new(false), production, config, DemoCredentials.Load(empty, new(false)), TimeProvider.System);
+        var auth = new AuthService(new(false), production, config, TimeProvider.System);
         Assert.Equal(503, Assert.Throws<ApiException>(() => auth.Login(new() { KullaniciAdi = "admin", Sifre = "demo123" })).Status);
         var dev = new FakeEnvironment { EnvironmentName = Environments.Development };
         Assert.NotEqual(JwtConfiguration.Load(empty, dev, new(true)).Key, JwtConfiguration.Load(empty, dev, new(true)).Key);
-        Assert.Throws<InvalidOperationException>(() => DemoCredentials.Load(empty, new(true)));
     }
 
     [Fact]

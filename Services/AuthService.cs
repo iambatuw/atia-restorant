@@ -24,27 +24,11 @@ public sealed record JwtConfiguration(string Key, string Issuer, string Audience
     }
 }
 
-public sealed record DemoCredentials(byte[] Admin, byte[] Waiter, byte[] Kitchen)
-{
-    private const string AdminPassword = "demo123";
-
-    public static DemoCredentials Load(IConfiguration configuration, BackendMode mode)
-    {
-        if (!mode.IsDemo) return new([], [], []);
-        var passwords = new[] { AdminPassword,
-            configuration["Demo:WaiterPassword"], configuration["Demo:KitchenPassword"] };
-        if (passwords.Skip(1).Any(p => string.IsNullOrWhiteSpace(p) || p.Length < 12 || p.Length > 128) ||
-            passwords.Distinct(StringComparer.Ordinal).Count() != passwords.Length)
-            throw new InvalidOperationException("Set distinct Demo waiter and kitchen passwords (12-128 characters), different from the admin demo password.");
-        return new(SHA256.HashData(Encoding.UTF8.GetBytes(passwords[0]!)),
-            SHA256.HashData(Encoding.UTF8.GetBytes(passwords[1]!)),
-            SHA256.HashData(Encoding.UTF8.GetBytes(passwords[2]!)));
-    }
-}
-
 public sealed class AuthService(BackendMode mode, IHostEnvironment environment, JwtConfiguration jwt,
-    DemoCredentials credentials, TimeProvider clock)
+    TimeProvider clock)
 {
+    private static readonly byte[] DemoPasswordHash = SHA256.HashData(Encoding.UTF8.GetBytes("demo123"));
+
     public LoginResponse Login(LoginRequest request)
     {
         if (!mode.IsDemo) throw new ApiException(503, "ERP kimlik doğrulaması henüz etkin değil.");
@@ -53,13 +37,13 @@ public sealed class AuthService(BackendMode mode, IHostEnvironment environment, 
             throw new ApiException(400, "Oturum açma bilgileri geçersiz.");
         var account = request.KullaniciAdi.Trim().ToLowerInvariant() switch
         {
-            "admin" => (Id: 1, Role: "Admin", Name: "Demo Yönetici", Hash: credentials.Admin),
-            "garson" => (Id: 2, Role: "Garson", Name: "Demo Garson", Hash: credentials.Waiter),
-            "mutfak" => (Id: 3, Role: "Mutfak", Name: "Demo Mutfak", Hash: credentials.Kitchen),
-            _ => (Id: 0, Role: "", Name: "", Hash: new byte[32])
+            "admin" => (Id: 1, Role: "Admin", Name: "Demo Yönetici"),
+            "garson" => (Id: 2, Role: "Garson", Name: "Demo Garson"),
+            "mutfak" => (Id: 3, Role: "Mutfak", Name: "Demo Mutfak"),
+            _ => (Id: 0, Role: "", Name: "")
         };
         var actual = SHA256.HashData(Encoding.UTF8.GetBytes(request.Sifre));
-        if (!CryptographicOperations.FixedTimeEquals(actual, account.Hash) || account.Id == 0)
+        if (!CryptographicOperations.FixedTimeEquals(actual, DemoPasswordHash) || account.Id == 0)
             throw new ApiException(401, "Kullanıcı adı veya şifre hatalı.");
         var now = clock.GetUtcNow().UtcDateTime;
         var claims = new[] { new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),

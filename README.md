@@ -54,20 +54,11 @@ Yeni siparişte müşteri ve teslimat bilgileriyle ürünleri girersiniz. Sipari
 
 Gerekenler: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). Depodaki derlenmiş arayüz `wwwroot` altında bulunduğu için yalnızca uygulamayı açacaksanız Node.js gerekmez.
 
-Windows'ta [AtiaBaslat.bat](AtiaBaslat.bat) dosyasına çift tıklayın. Dosya garson ve mutfak parolalarını oluşturur, sunucuyu başlatır ve hazır olduğunda giriş sayfasını tarayıcıda açar. Parolalar açılan komut penceresinde görünür; sunucu aynı pencere açık kaldığı sürece çalışır.
+Windows'ta [AtiaBaslat.bat](AtiaBaslat.bat) dosyasına çift tıklayın. Dosya sunucuyu başlatır ve hazır olduğunda giriş sayfasını tarayıcıda açar. Sunucu komut penceresi açık kaldığı sürece çalışır.
 
 Depo kökünde:
 
 ```powershell
-foreach ($role in 'Waiter','Kitchen') {
-    $bytes = New-Object byte[] 24
-    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-    $rng.GetBytes($bytes)
-    $rng.Dispose()
-    $password = [Convert]::ToBase64String($bytes)
-    Set-Item -Path "Env:Demo__$($role)Password" -Value $password
-    Write-Host "$role parolası: $password"
-}
 dotnet run --environment Development --urls "http://0.0.0.0:5080"
 ```
 
@@ -75,15 +66,15 @@ Sunucu bilgisayarında personel girişi için `http://127.0.0.1:5080/login` adre
 
 ### Demo hesapları
 
-Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir. Yönetici parolası `demo123` olarak sabittir. Garson ve mutfak parolaları yukarıdaki komutta üretilir; çıktıdaki değerleri ilgili hesapla kullanın.
+Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir. Üç hesabın parolası da `demo123`.
 
 | Rol | Kullanıcı adı | Parola |
 | --- | --- | --- |
 | Yönetici | `admin` | `demo123` |
-| Garson | `garson` | `Demo__WaiterPassword` |
-| Mutfak | `mutfak` | `Demo__KitchenPassword` |
+| Garson | `garson` | `demo123` |
+| Mutfak | `mutfak` | `demo123` |
 
-Demo sunucuya erişebilen diğer bilgisayarlardan da açılır. `admin/demo123` bilgileri bu depoda açıkça yer aldığı için erişimi ağ düzeyinde kısıtlamadan gerçek işletme verisiyle kullanmayın. İmzalı oturum belirtecindeki rol sunucuda doğrulanır; istek gövdesindeki rol veya personel alanı yetki vermez. Demo siparişleri, rezervasyonları ve ödemeleri kalıcı değildir. Sunucuyu yeniden başlattığınızda başlangıç verisine dönersiniz.
+Demo sunucuya erişebilen diğer bilgisayarlardan da açılır. Üç hesabın giriş bilgileri bu depoda açıkça yer aldığı için erişimi ağ düzeyinde kısıtlamadan gerçek işletme verisiyle kullanmayın. İmzalı oturum belirtecindeki rol sunucuda doğrulanır; istek gövdesindeki rol veya personel alanı yetki vermez. Demo siparişleri, rezervasyonları ve ödemeleri kalıcı değildir. Sunucuyu yeniden başlattığınızda başlangıç verisine dönersiniz.
 
 ### Arayüz üzerinde çalışmak
 
