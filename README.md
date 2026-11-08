@@ -7,7 +7,7 @@
 
 ATIA'nın masaüstü restoran uygulamasını web ortamına taşıyoruz. Bu depoda personel ekranları, API ve tarayıcıda açılan müşteri menüsü birlikte duruyor. Şu anki sürüm, restoran akışlarını **demo verisiyle** denemek için çalışıyor; gerçek mağaza veritabanına bağlı değil.
 
-Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük rapor ve rezervasyon var. Giriş ekranı korunarak diğer personel ekranları yeniden düzenlendi. Masaüstünden hangi özelliklerin taşınmaya değer olduğunu ve hangi bağlantıların beklediğini [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) anlattık.
+Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük rapor, menü yönetimi, gelen sipariş kutusu ve rezervasyon var. Giriş ekranı korunarak diğer personel ekranları yeniden düzenlendi. Masaüstünden hangi özelliklerin taşınmaya değer olduğunu ve hangi bağlantıların beklediğini [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) anlattık.
 
 ### Ekranlardan örnekler
 
@@ -20,11 +20,12 @@ Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük ra
 | Alan | Demo ortamında yapabilecekleriniz | Sınır |
 | --- | --- | --- |
 | Masalar ve adisyon | Bölüm veya duruma göre masa bulma; ürün, porsiyon ve sipariş notu ekleme; adet değiştirme; gerekçeli iptal veya zayi; ödeme alma; masa taşıma, ayırma ve birleştirme | İşlemler bellekte tutulur. Sunucu yeniden başlayınca sıfırlanır. |
-| Mutfak | Ürünleri ayrı ayrı hazır işaretleme; ekleme, değişiklik, iptal ve zayi bildirimlerini görme veya tarayıcıdan yazdırma | Yazdırma tarayıcının yazdırma penceresini açar; fiziksel çıktı doğrulanmaz. |
+| Mutfak | Ürünleri ayrı ayrı hazır işaretleme; bildirimleri yazdırma kuyruğunda izleme, yazdırma denemesi ve sonucu kaydetme | Yazdırma tarayıcının yazdırma penceresini açar; başarı veya hata personel tarafından işaretlenir, fiziksel çıktı otomatik doğrulanmaz. |
 | Paket servis | Müşteri, telefon, adres, ürün ve ödeme şekliyle sipariş açma; kurye atayıp siparişi hazırlama, yola çıkarma ve teslim etme | Manuel demo akışıdır. Çevrim içi sipariş sağlayıcılarından otomatik kayıt almaz. |
-| Günlük rapor | İşletme gününe göre satışları, ödeme türlerini, saatlik tutarları, iptal/zayi, işlem geçmişini ve mutabakatı görme | Paket servis kayıtları henüz bu rapora katılmaz. İşlem geçmişi demo sunucusu yeniden başlayınca sıfırlanır. |
+| Günlük rapor | İşletme gününe göre masa ve teslim edilmiş paket satışlarını ayrı ve toplam gösterme; ödeme türleri, saatlik masa tutarları, iptal/zayi, işlem geçmişi ve mutabakatı görme | Paket ödemesi sadece seçilen ödeme şekli olarak kayıtlıdır; tahsilat doğrulanmadığı için masa kasası mutabakatına katılmaz. İşlem geçmişi sunucu yeniden başlayınca sıfırlanır. |
 | Rezervasyon | Tarihe göre kayıt görme, yeni rezervasyon açma ve iptal etme | Az kullanılan bir akış olduğu için ikincil menüdedir. |
-| Menü | Personelin ürünleri araması; müşterinin `/menu` adresinden ürün ve fiyatları görmesi | Müşteri menüsü sipariş göndermez; ürün düzenleme ekranı henüz yoktur. |
+| Menü | Yöneticinin kategori, ürün, porsiyon, fiyat ve görünürlüğü düzenlemesi; personelin ürünleri araması; müşterinin `/menu` adresinden aktif ürünleri görmesi | Müşteri menüsü sipariş göndermez; değişiklikler demo belleğinde kalır. |
+| Gelen siparişler | PlatinMarket veya Entegra kaynaklı örnek siparişi elle girme, ürün kodunu eşleme ve paket servise aktarma; aynı kaynak ve sipariş numarasını ikinci kez aktarmama | Sağlayıcıdan otomatik sipariş çekmez; tek ürün satırlı demo kaydıdır. |
 | POS | Adisyon ödemesinde manuel POS veya Hugin S1/PayGo için örnek işlem ve sonuç sorgulama | Fiziksel terminale bağlanmaz. Onay adımı simülasyondur. |
 
 ### Masadan ödemeye
@@ -39,11 +40,19 @@ Yönetici günlük raporda gerekçeli iptal, zayi, ikram, ödeme ve masa işleml
 
 Yeni siparişte müşteri ve teslimat bilgileriyle ürünleri girersiniz. Sipariş **Yeni → Hazırlanıyor → Yolda → Teslim edildi** sırasıyla ilerler. Yola çıkarırken kurye adı gerekir. Ürün fiyatları sunucudaki menüden alınır; tekrar gönderilen isteğin ikinci bir sipariş açmaması için işlem anahtarı kullanılır. Bu akış henüz gerçek müşteri ve sipariş tablolarına bağlı değildir.
 
+Yönetici **Entegrasyonlar → Gelen sipariş kutusu** bölümünde PlatinMarket veya Entegra adına örnek bir sipariş ekleyebilir. Kaynak ürün kodu menüdeki stok koduyla uyuşursa ürün kendiliğinden eşleşir; uyuşmazsa yönetici ürün seçer. **Paket servise aktar** işlemi aynı gelen siparişi ikinci kez paket siparişine dönüştürmez. Siparişin fiyatı aktarma sırasında sunucudaki aktif menüden alınır. Bu kutu sağlayıcıdan canlı veri almaz; gerçek bağlantı için sağlayıcı sözleşmesi, erişim bilgileri ve doğrulanmış veritabanı şeması gerekir.
+
+### Menü ve mutfak
+
+Yönetici menü ekranında kategori ve ürün ekleyebilir, adları ve fiyatları düzenleyebilir, porsiyon tanımlayabilir ve ürünü müşteri menüsünden kaldırmak için pasifleştirebilir. Ürün değişiklikleri yeni siparişleri etkiler; mevcut adisyon satırlarının kaydedilmiş fiyatını geriye dönük değiştirmez.
+
+Mutfak bildirimlerinde yazdırma denemesi kuyrukta görünür. Tarayıcının yazdırma penceresi açıldıktan sonra mutfak personeli **Yazdırıldı** veya **Yazdırılamadı** sonucunu kaydeder. Hatalı kayıt tekrar denenebilir; başarılı sonuçtan sonra bildirim görüldü olarak işaretlenebilir. Tarayıcı gerçek kâğıt çıktısını doğrulayamadığı için bu adım personel onayına dayanır.
+
 ### Kim hangi ekrana girer?
 
 | Rol | Erişim |
 | --- | --- |
-| Yönetici (`admin`) | Genel bakış, masalar, paket servis, mutfak, menü, günlük rapor, entegrasyon durumu ve rezervasyonlar. Ödeme ve masa taşıma gibi yönetici işlemleri bu roldedir. |
+| Yönetici (`admin`) | Genel bakış, masalar, paket servis, mutfak, menü ve ürün yönetimi, günlük rapor, gelen sipariş kutusu ve rezervasyonlar. Ödeme ve masa taşıma gibi yönetici işlemleri bu roldedir. |
 | Garson (`garson`) | Masalar, sipariş ve paket servis akışı, menü. |
 | Mutfak (`mutfak`) | Mutfak fişleri ve menü. |
 | Müşteri | Giriş yapmadan `/menu` adresindeki salt okunur menü. |
@@ -116,7 +125,7 @@ npm test
 npm run build
 ```
 
-8 Kasım 2026 kontrolünde 34 API ve 16 arayüz testi geçti; üretim derlemesi de tamamlandı. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
+8 Kasım 2026 kontrolünde 39 API ve 16 arayüz testi geçti; TypeScript denetimi ve üretim derlemesi de tamamlandı. Testler menü ve gelen sipariş yetkilerini, fiyatın sunucuda belirlenmesini, mükerrer kayıt korumasını, paket raporunu ve yazdırma kuyruğunun durum geçişlerini kapsıyor. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
 
 ## Canlı kullanımdan önce
 

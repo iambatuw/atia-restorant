@@ -233,7 +233,7 @@ export default function App(){
             ):page==='mutfak'?(
               <Kitchen/>
             ):page==='menu'?(
-              <MenuPage/>
+              <MenuPage admin={session.Rol==='Admin'}/>
             ):page==='entegrasyonlar'?(
               <Integrations navigate={p=>navigate(pagePath(p))}/>
             ):(

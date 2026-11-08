@@ -106,6 +106,55 @@ public sealed class HttpContractTests
     }
 
     [Fact]
+    public async Task MenuManagementAndIncomingOrdersRequireAdminAndUseServerPrices()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        await Login(client, "garson");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/menu/yonetim")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/entegrasyonlar/gelen", new { Kaynak = "Entegra" })).StatusCode);
+        await Login(client, "admin");
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/menu/urunler", new
+        { GrupKayitNo = 1, StokAdi = "Geçersiz", SatisFiyati = 75m, Aktif = true, Porsiyonlar = new object?[] { null } })).StatusCode);
+        var productResponse = await client.PostAsJsonAsync("/api/menu/urunler", new
+        { GrupKayitNo = 1, StokAdi = "Deneme ürünü", SatisFiyati = 75m, Aktif = true, Porsiyonlar = Array.Empty<object>() });
+        Assert.Equal(HttpStatusCode.OK, productResponse.StatusCode);
+        var product = (await productResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("Data");
+        var productId = product.GetProperty("KayitNo").GetInt64();
+        var stageRequest = new { Kaynak = "Entegra", HariciSiparisNo = "E-100", KaynakUrunKodu = "BILINMIYOR",
+            Miktar = 2, MusteriAdi = "Ayşe", Telefon = "05550000000", Adres = "Merkez", OdemeSekli = "Nakit" };
+        var staged = await client.PostAsJsonAsync("/api/entegrasyonlar/gelen", stageRequest);
+        Assert.Equal(HttpStatusCode.OK, staged.StatusCode);
+        var id = (await staged.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("Data").GetProperty("KayitNo").GetInt64();
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync($"/api/entegrasyonlar/gelen/{id}/aktar", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/entegrasyonlar/gelen/{id}/eslestir", new { StokKayitNo = productId })).StatusCode);
+        var transferred = await client.PostAsync($"/api/entegrasyonlar/gelen/{id}/aktar", null);
+        Assert.Equal(HttpStatusCode.OK, transferred.StatusCode);
+        var deliveryId = (await transferred.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("Data").GetProperty("PaketSiparisNo").GetInt64();
+        var repeated = await client.PostAsync($"/api/entegrasyonlar/gelen/{id}/aktar", null);
+        Assert.Equal(deliveryId, (await repeated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("Data").GetProperty("PaketSiparisNo").GetInt64());
+        var deliveries = (await client.GetFromJsonAsync<JsonElement>("/api/paket-siparisler")).GetProperty("Data");
+        Assert.Equal(150m, deliveries[0].GetProperty("GenelToplam").GetDecimal());
+    }
+
+    [Fact]
+    public async Task KitchenPrintRequiresManualResultBeforeQueueRemoval()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        await Login(client, "mutfak");
+        var queue = (await client.GetFromJsonAsync<JsonElement>("/api/mutfak/bildirimler")).GetProperty("Data");
+        var id = queue[0].GetProperty("KayitNo").GetInt64();
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync($"/api/mutfak/bildirimler/{id}/goruldu", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/mutfak/bildirimler/{id}/yazdir", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/mutfak/bildirimler/{id}/yazdirma-sonucu", new { Basarili = false })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/mutfak/bildirimler/{id}/yazdir", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/mutfak/bildirimler/{id}/yazdirma-sonucu", new { Basarili = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync($"/api/mutfak/bildirimler/{id}/yazdir", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/mutfak/bildirimler/{id}/goruldu", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task HealthMenuPascalCaseAndAuthenticatedRolesMatchContract()
     {
         using var factory = new ApiFactory();

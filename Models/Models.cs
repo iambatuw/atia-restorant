@@ -122,6 +122,13 @@ public class MutfakBildirimDTO
     public string? Not { get; set; }
     public DateTime Tarih { get; set; }
     public bool Goruldu { get; set; }
+    public int YazdirmaDenemesi { get; set; }
+    public MutfakYazdirmaDurumu YazdirmaDurumu { get; set; }
+}
+public enum MutfakYazdirmaDurumu { Bekliyor, KontrolBekliyor, Tamamlandi, Hatali }
+public class MutfakYazdirmaSonucRequest
+{
+    public bool Basarili { get; set; }
 }
 
 // ───── ÖDEME ─────
@@ -241,6 +248,19 @@ public class MenuUrunDTO
     public List<PorsiyonDTO> Porsiyonlar { get; set; } = new();
 }
 
+public class MenuKategoriYazRequest
+{
+    public string GrupAdi { get; set; } = "";
+}
+public class MenuUrunYazRequest
+{
+    public long GrupKayitNo { get; set; }
+    public string StokAdi { get; set; } = "";
+    public decimal SatisFiyati { get; set; }
+    public bool Aktif { get; set; } = true;
+    public List<PorsiyonDTO> Porsiyonlar { get; set; } = [];
+}
+
 public class PorsiyonDTO
 {
     public int KayitNo { get; set; }
@@ -274,6 +294,39 @@ public class PaketSiparisDTO
     public PaketDurum Durum { get; set; }
     public decimal GenelToplam { get; set; }
     public List<PaketSiparisSatirDTO> Satirlar { get; set; } = new();
+    public DateTime? TamamlanmaTarihi { get; set; }
+    public DateTime? IptalTarihi { get; set; }
+}
+
+public class GelenSiparisDTO
+{
+    public long KayitNo { get; set; }
+    public string Kaynak { get; set; } = "";
+    public string HariciSiparisNo { get; set; } = "";
+    public string KaynakUrunKodu { get; set; } = "";
+    public long? EslesenStokKayitNo { get; set; }
+    public int Miktar { get; set; }
+    public string MusteriAdi { get; set; } = "";
+    public string Telefon { get; set; } = "";
+    public string Adres { get; set; } = "";
+    public string OdemeSekli { get; set; } = "Nakit";
+    public DateTime Tarih { get; set; }
+    public long? PaketSiparisNo { get; set; }
+}
+public class GelenSiparisEkleRequest
+{
+    public string Kaynak { get; set; } = "";
+    public string HariciSiparisNo { get; set; } = "";
+    public string KaynakUrunKodu { get; set; } = "";
+    public int Miktar { get; set; }
+    public string MusteriAdi { get; set; } = "";
+    public string Telefon { get; set; } = "";
+    public string Adres { get; set; } = "";
+    public string OdemeSekli { get; set; } = "Nakit";
+}
+public class GelenSiparisEslemeRequest
+{
+    public long StokKayitNo { get; set; }
 }
 
 public class PaketSiparisSatirIstek
@@ -404,6 +457,11 @@ public class GunlukRaporDTO
     public List<SaatlikCiroDTO> SaatlikCiro { get; set; } = new();
     public List<UrunSatisDTO> EnCokSatan { get; set; } = new();
     public GunlukMutabakatDTO Mutabakat { get; set; } = new();
+    public decimal PaketCiro { get; set; }
+    public int TeslimEdilenPaket { get; set; }
+    public int IptalEdilenPaket { get; set; }
+    public int AcikPaket { get; set; }
+    public decimal GenelSatis { get; set; }
 }
 
 public class VardiyaKapanisRequest

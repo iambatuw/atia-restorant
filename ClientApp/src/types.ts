@@ -22,15 +22,16 @@ export interface Receipt {
   Detaylar:OrderLine[];
 }
 export interface KitchenTicket {BaslikKayitNo:number;MasaAdi:string;BolumAdi:string;SiparisZamani:string;BeklemeSuresi:number;Satirlar:{DetayKayitNo:number;StokAdi:string;Miktar:number;KalanMiktar:number;SatirAciklama:string|null}[]}
-export interface KitchenEvent {KayitNo:number;AdisyonNo:number;MasaAdi:string;UrunAdi:string;Islem:string;Miktar:number;Not:string|null;Tarih:string;Goruldu:boolean}
+export interface KitchenEvent {KayitNo:number;AdisyonNo:number;MasaAdi:string;UrunAdi:string;Islem:string;Miktar:number;Not:string|null;Tarih:string;Goruldu:boolean;YazdirmaDenemesi:number;YazdirmaDurumu:0|1|2|3}
 export interface Reconciliation {KapananSatis:number;Tahsilat:number;Fark:number;Nakit:number;Banka:number;YemekKarti:number;Cari:number;Indirim:number;SilinenUrunTutari:number;IptalTutari:number;ZayiTutari:number;IkramTutari:number;OdemeSayisi:number}
 export interface AuditEntry {KayitNo:number;Tarih:string;Islem:string;Aciklama:string;AdisyonNo:number|null;PersonelId:number;PersonelAdi:string;Tutar:number}
 export interface ShiftClose {IsletmeTarihi:string;KapanisZamani:string;PersonelAdi:string;BeklenenNakit:number;SayilanNakit:number;NakitFarki:number;Aciklama:string|null}
-export interface Report {IsletmeTarihi:string;Bugun:string;BaslangicSaati:number;VardiyaKapanisi:ShiftClose|null;ToplamCiro:number;ToplamAdisyon:number;AcikAdisyon:number;NakitToplam:number;BankaToplam:number;CariToplam:number;YemekKartiToplam:number;IndirimToplam:number;SaatlikCiro:{Saat:number;Ciro:number;AdisyonSayisi:number}[];EnCokSatan:{StokAdi:string;ToplamMiktar:number;ToplamTutar:number}[];Mutabakat:Reconciliation}
+export interface Report {IsletmeTarihi:string;Bugun:string;BaslangicSaati:number;VardiyaKapanisi:ShiftClose|null;ToplamCiro:number;ToplamAdisyon:number;AcikAdisyon:number;NakitToplam:number;BankaToplam:number;CariToplam:number;YemekKartiToplam:number;IndirimToplam:number;SaatlikCiro:{Saat:number;Ciro:number;AdisyonSayisi:number}[];EnCokSatan:{StokAdi:string;ToplamMiktar:number;ToplamTutar:number}[];Mutabakat:Reconciliation;PaketCiro:number;TeslimEdilenPaket:number;IptalEdilenPaket:number;AcikPaket:number;GenelSatis:number}
 export interface Reservation {KayitNo:number;MasaKayitNo:number;MasaAdi:string;MusteriAdi:string;Telefon:string;RezervasyonTarihi:string;KisiSayisi:number;Aciklama:string}
 export type DeliveryStatus=0|1|2|3|4;
 export interface DeliveryLine {StokKayitNo:number;StokAdi:string;PorsiyonKayitNo:number|null;PorsiyonAdi:string|null;Miktar:number;BirimFiyat:number;SatirTutari:number}
 export interface DeliveryOrder {KayitNo:number;KayitTarihi:string;MusteriAdi:string;Telefon:string;Adres:string;Aciklama:string|null;OdemeSekli:string;Kurye:string|null;Durum:DeliveryStatus;GenelToplam:number;Satirlar:DeliveryLine[]}
+export interface IncomingOrder {KayitNo:number;Kaynak:'PlatinMarket'|'Entegra';HariciSiparisNo:string;KaynakUrunKodu:string;EslesenStokKayitNo:number|null;Miktar:number;MusteriAdi:string;Telefon:string;Adres:string;OdemeSekli:'Nakit'|'Kart'|'Online';Tarih:string;PaketSiparisNo:number|null}
 
 // ───── POS CİHAZ ENTEGRASYONU ─────
 export type PosCihazTipi = 0 | 1 | 2; // 0=HariciManuelPos, 1=HuginS1, 2=PayGo

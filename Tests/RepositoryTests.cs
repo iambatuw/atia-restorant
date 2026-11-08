@@ -80,6 +80,9 @@ public sealed class RepositoryTests
         repository.MarkLineReady(line.KayitNo, Cook);
         Assert.Equal(409, Assert.Throws<ApiException>(() => repository.MarkLineReady(line.KayitNo, Cook)).Status);
         var eventItem = repository.KitchenEvents(Cook).Single(e => e.AdisyonNo == receipt.KayitNo);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.AcknowledgeKitchenEvent(eventItem.KayitNo, Cook)).Status);
+        repository.RequestKitchenPrint(eventItem.KayitNo, Cook);
+        repository.FinishKitchenPrint(eventItem.KayitNo, new() { Basarili = true }, Cook);
         repository.AcknowledgeKitchenEvent(eventItem.KayitNo, Cook);
         Assert.DoesNotContain(repository.KitchenEvents(Cook), e => e.KayitNo == eventItem.KayitNo);
         repository.RemoveOrder(line.KayitNo, new() { Tip = SiparisCikarmaTipi.Zayi,
@@ -112,6 +115,71 @@ public sealed class RepositoryTests
         var done = repository.UpdateDelivery(delivery.KayitNo, new() { Durum = PaketDurum.TeslimEdildi }, Waiter);
         Assert.Equal("Mehmet", done.Kurye);
         Assert.Equal(PaketDurum.TeslimEdildi, done.Durum);
+        var report = repository.DailyReport(repository.BusinessToday, Admin);
+        Assert.Equal(640m, report.PaketCiro);
+        Assert.Equal(1, report.TeslimEdilenPaket);
+        Assert.Equal(report.ToplamCiro + 640m, report.GenelSatis);
+        Assert.Equal(0m, report.Mutabakat.Fark);
+    }
+
+    [Fact]
+    public void AdminMenuEditsAffectNewOrdersButPreserveExistingReceiptPrices()
+    {
+        var repository = Repository();
+        var original = repository.AddOrder(Order(), Waiter);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.ManageMenu(Waiter)).Status);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.SaveProduct(4,
+            new() { GrupKayitNo = 2, StokAdi = "Köfte", SatisFiyati = 400 }, Waiter)).Status);
+        var category = repository.SaveCategory(null, new() { GrupAdi = "Günün ürünleri" }, Admin);
+        var changed = repository.SaveProduct(4, new() { GrupKayitNo = category.KayitNo,
+            StokAdi = "Izgara Köfte", SatisFiyati = 400, Aktif = true,
+            Porsiyonlar = [new() { PorsiyonAdi = "Tam", Fiyat = 400 }] }, Admin);
+        Assert.Equal(320m, original.Detaylar.Single().BirimFiyat);
+        Assert.Equal(400m, repository.AddOrder(Order(11), Waiter).Detaylar.Single().BirimFiyat);
+        repository.SaveProduct(changed.KayitNo, new() { GrupKayitNo = category.KayitNo,
+            StokAdi = changed.StokAdi!, SatisFiyati = 400, Aktif = false }, Admin);
+        Assert.DoesNotContain(repository.Menu().SelectMany(c => c.Urunler), p => p.KayitNo == changed.KayitNo);
+        Assert.Contains(repository.ManageMenu(Admin).SelectMany(c => c.Urunler), p => p.KayitNo == changed.KayitNo);
+        Assert.Equal(404, Assert.Throws<ApiException>(() => repository.AddOrder(Order(9), Waiter)).Status);
+    }
+
+    [Fact]
+    public void IncomingOrderNeedsMappingAndTransfersOnlyOnce()
+    {
+        var repository = Repository();
+        var request = new GelenSiparisEkleRequest { Kaynak = "PlatinMarket", HariciSiparisNo = "PM-100",
+            KaynakUrunKodu = "BILINMIYOR", Miktar = 2, MusteriAdi = "Ayşe", Telefon = "05550000000",
+            Adres = "Merkez Mahallesi", OdemeSekli = "Nakit" };
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.StageIncomingOrder(request, Waiter)).Status);
+        var staged = repository.StageIncomingOrder(request, Admin);
+        Assert.Null(staged.EslesenStokKayitNo);
+        Assert.Equal(staged.KayitNo, repository.StageIncomingOrder(request, Admin).KayitNo);
+        Assert.Single(repository.IncomingOrders(Admin));
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.TransferIncomingOrder(staged.KayitNo, Admin)).Status);
+        repository.MapIncomingOrder(staged.KayitNo, new() { StokKayitNo = 4 }, Admin);
+        var transferred = repository.TransferIncomingOrder(staged.KayitNo, Admin);
+        Assert.Equal(transferred.PaketSiparisNo, repository.TransferIncomingOrder(staged.KayitNo, Admin).PaketSiparisNo);
+        Assert.Single(repository.Deliveries(Admin));
+        request.Miktar = 3;
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.StageIncomingOrder(request, Admin)).Status);
+    }
+
+    [Fact]
+    public void KitchenPrintQueueTracksFailureRetryAndManualConfirmation()
+    {
+        var repository = Repository();
+        var receipt = repository.AddOrder(Order(), Waiter);
+        var item = repository.KitchenEvents(Cook).Single(e => e.AdisyonNo == receipt.KayitNo);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.RequestKitchenPrint(item.KayitNo, Waiter)).Status);
+        var first = repository.RequestKitchenPrint(item.KayitNo, Cook);
+        Assert.Equal(1, first.YazdirmaDenemesi);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.RequestKitchenPrint(item.KayitNo, Cook)).Status);
+        repository.FinishKitchenPrint(item.KayitNo, new() { Basarili = false }, Cook);
+        var retry = repository.RequestKitchenPrint(item.KayitNo, Cook);
+        Assert.Equal(2, retry.YazdirmaDenemesi);
+        repository.FinishKitchenPrint(item.KayitNo, new() { Basarili = true }, Cook);
+        repository.AcknowledgeKitchenEvent(item.KayitNo, Cook);
+        Assert.DoesNotContain(repository.KitchenEvents(Cook), e => e.KayitNo == item.KayitNo);
     }
 
     [Fact]

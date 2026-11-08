@@ -36,9 +36,11 @@ public sealed class RestaurantRepository
     private readonly Dictionary<string, string> _posIdempotency = [];
     private readonly List<IslemKaydiDTO> _audit = [];
     private readonly List<MutfakBildirimDTO> _kitchenEvents = [];
+    private readonly List<GelenSiparisDTO> _incomingOrders = [];
     private readonly Dictionary<DateOnly, VardiyaKapanisDTO> _shiftClosings = [];
     private readonly HashSet<long> _mergedReceipts = [];
-    private long _nextAudit, _nextKitchenEvent;
+    private long _nextAudit, _nextKitchenEvent, _nextIncomingOrder, _nextProduct = 11, _nextCategory = 4;
+    private int _nextPortion = 1000;
     private readonly int _businessDayStartHour;
     private long _nextReceipt = 1000, _nextLine = 10000, _nextReservation = 100, _nextDelivery = 3000;
     private DateTime Now => _clock.GetUtcNow().UtcDateTime;
@@ -164,7 +166,61 @@ public sealed class RestaurantRepository
     public List<RestorantBolumDTO> Sections() => Read(() => _tables.GroupBy(t => t.RestorantBolumuKayitNo).Select(g =>
         new RestorantBolumDTO { KayitNo = g.Key!.Value, BolumKodu = g.First().RestorantBolumKodu,
             BolumAdi = g.First().RestorantBolumAdi, ToplamMasa = g.Count(), DoluMasa = g.Count(t => Open(t.MasaId) is not null) }).ToList());
-    public List<MenuKategoriDTO> Menu() => Read(() => _menu);
+    public List<MenuKategoriDTO> Menu() => Read(() => _menu.Select(category => new MenuKategoriDTO
+    {
+        KayitNo = category.KayitNo, GrupKodu = category.GrupKodu, GrupAdi = category.GrupAdi,
+        SiraNo = category.SiraNo, Urunler = category.Urunler.Where(product => product.Aktif).ToList()
+    }).Where(category => category.Urunler.Count > 0).ToList());
+    public List<MenuKategoriDTO> ManageMenu(StaffActor actor) => Read(() =>
+    {
+        Staff(actor, "Admin"); return _menu;
+    });
+    public MenuKategoriDTO SaveCategory(long? id, MenuKategoriYazRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        Require(!string.IsNullOrWhiteSpace(request.GrupAdi) && request.GrupAdi.Trim().Length <= 80, "Kategori adı 1–80 karakter olmalı.");
+        Require(!_menu.Any(c => c.KayitNo != id && string.Equals(c.GrupAdi, request.GrupAdi.Trim(), StringComparison.OrdinalIgnoreCase)), "Kategori adı zaten kullanılıyor.", 409);
+        var category = id.HasValue ? _menu.FirstOrDefault(c => c.KayitNo == id.Value)
+            ?? throw new ApiException(404, "Kategori bulunamadı.") : new MenuKategoriDTO
+            { KayitNo = ++_nextCategory, GrupKodu = $"G{_nextCategory}", SiraNo = _menu.Count };
+        category.GrupAdi = request.GrupAdi.Trim();
+        foreach (var product in category.Urunler) product.GrupAdi = category.GrupAdi;
+        if (!id.HasValue) _menu.Add(category);
+        Log(actor, "Menü kategorisi düzenlendi", category.GrupAdi);
+        return category;
+    });
+    public MenuUrunDTO SaveProduct(long? id, MenuUrunYazRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        var category = _menu.FirstOrDefault(c => c.KayitNo == request.GrupKayitNo)
+            ?? throw new ApiException(404, "Kategori bulunamadı.");
+        Require(!string.IsNullOrWhiteSpace(request.StokAdi) && request.StokAdi.Trim().Length <= 120, "Ürün adı 1–120 karakter olmalı.");
+        Require(request.SatisFiyati >= 0 && request.SatisFiyati <= 100000 && decimal.Round(request.SatisFiyati, 2) == request.SatisFiyati,
+            "Fiyat 0–100.000 aralığında ve en fazla iki ondalıklı olmalı.");
+        var portions = request.Porsiyonlar ?? throw new ApiException(400, "Porsiyon listesi geçersiz.");
+        Require(portions.Count <= 10, "En fazla 10 porsiyon tanımlanabilir.");
+        Require(portions.All(p => p is not null), "Porsiyon listesi geçersiz.");
+        foreach (var portion in portions)
+        {
+            Require(!string.IsNullOrWhiteSpace(portion.PorsiyonAdi) && portion.PorsiyonAdi.Trim().Length <= 60,
+                "Porsiyon adı 1–60 karakter olmalı.");
+            Require(portion.Fiyat >= 0 && portion.Fiyat <= 100000 && decimal.Round(portion.Fiyat, 2) == portion.Fiyat,
+                "Porsiyon fiyatı geçersiz.");
+        }
+        Require(portions.Select(p => p.PorsiyonAdi!.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() == portions.Count,
+            "Porsiyon adları farklı olmalı.");
+        var previous = id.HasValue ? _menu.SelectMany(c => c.Urunler).FirstOrDefault(p => p.KayitNo == id.Value)
+            ?? throw new ApiException(404, "Ürün bulunamadı.") : null;
+        var product = previous ?? new MenuUrunDTO { KayitNo = ++_nextProduct, StokKodu = $"U{_nextProduct:000}", Birimi = "Adet" };
+        product.StokAdi = request.StokAdi.Trim(); product.SatisFiyati = request.SatisFiyati;
+        product.GrupKayitNo = category.KayitNo; product.GrupAdi = category.GrupAdi; product.Aktif = request.Aktif;
+        product.Porsiyonlar = portions.Select(p => new PorsiyonDTO
+            { KayitNo = ++_nextPortion, PorsiyonAdi = p.PorsiyonAdi!.Trim(), Fiyat = p.Fiyat }).ToList();
+        if (previous is not null) _menu.Single(c => c.Urunler.Contains(previous)).Urunler.Remove(previous);
+        category.Urunler.Add(product);
+        Log(actor, "Menü ürünü düzenlendi", product.StokAdi);
+        return product;
+    });
     public List<PaketSiparisDTO> Deliveries(StaffActor actor) => Read(() =>
     {
         Staff(actor, "Garson", "Admin");
@@ -229,7 +285,76 @@ public sealed class RestaurantRepository
                 "Kurye adı 1–100 karakter olmalı.");
         delivery.Durum = request.Durum;
         if (request.Durum == PaketDurum.Yolda) delivery.Kurye = request.Kurye!.Trim();
+        if (request.Durum == PaketDurum.TeslimEdildi) delivery.TamamlanmaTarihi = Now;
+        if (request.Durum == PaketDurum.Iptal) delivery.IptalTarihi = Now;
         return delivery;
+    });
+    public List<GelenSiparisDTO> IncomingOrders(StaffActor actor) => Read(() =>
+    {
+        Staff(actor, "Admin");
+        return _incomingOrders.OrderByDescending(o => o.KayitNo).ToList();
+    });
+    public GelenSiparisDTO StageIncomingOrder(GelenSiparisEkleRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        Require(request.Kaynak is "PlatinMarket" or "Entegra", "Kaynak geçersiz.");
+        Require(!string.IsNullOrWhiteSpace(request.HariciSiparisNo) && request.HariciSiparisNo.Trim().Length <= 80,
+            "Sağlayıcı sipariş numarası 1–80 karakter olmalı.");
+        Require(!string.IsNullOrWhiteSpace(request.KaynakUrunKodu) && request.KaynakUrunKodu.Trim().Length <= 80,
+            "Ürün kodu 1–80 karakter olmalı.");
+        Require(request.Miktar is >= 1 and <= 50, "Miktar 1–50 olmalı.");
+        Require(!string.IsNullOrWhiteSpace(request.MusteriAdi) && request.MusteriAdi.Trim().Length <= 100,
+            "Müşteri adı 1–100 karakter olmalı.");
+        Require(!string.IsNullOrWhiteSpace(request.Telefon) && request.Telefon.Trim().Length <= 30,
+            "Telefon 1–30 karakter olmalı.");
+        Require(!string.IsNullOrWhiteSpace(request.Adres) && request.Adres.Trim().Length <= 300,
+            "Adres 1–300 karakter olmalı.");
+        Require(request.OdemeSekli is "Nakit" or "Kart" or "Online", "Ödeme şekli geçersiz.");
+        var existing = _incomingOrders.FirstOrDefault(o => o.Kaynak == request.Kaynak &&
+            string.Equals(o.HariciSiparisNo, request.HariciSiparisNo.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            Require(existing.KaynakUrunKodu == request.KaynakUrunKodu.Trim() && existing.Miktar == request.Miktar &&
+                existing.MusteriAdi == request.MusteriAdi.Trim() && existing.Telefon == request.Telefon.Trim() &&
+                existing.Adres == request.Adres.Trim() && existing.OdemeSekli == request.OdemeSekli,
+                "Aynı sağlayıcı sipariş numarası farklı içerikle geldi.", 409);
+            return existing;
+        }
+        var product = _menu.SelectMany(c => c.Urunler).FirstOrDefault(p => p.Aktif &&
+            string.Equals(p.StokKodu, request.KaynakUrunKodu.Trim(), StringComparison.OrdinalIgnoreCase));
+        var incoming = new GelenSiparisDTO { KayitNo = ++_nextIncomingOrder, Kaynak = request.Kaynak,
+            HariciSiparisNo = request.HariciSiparisNo.Trim(), KaynakUrunKodu = request.KaynakUrunKodu.Trim(),
+            EslesenStokKayitNo = product?.KayitNo, Miktar = request.Miktar, MusteriAdi = request.MusteriAdi.Trim(),
+            Telefon = request.Telefon.Trim(), Adres = request.Adres.Trim(), OdemeSekli = request.OdemeSekli, Tarih = Now };
+        _incomingOrders.Add(incoming);
+        Log(actor, "Entegrasyon siparişi alındı", $"{incoming.Kaynak} #{incoming.HariciSiparisNo}");
+        return incoming;
+    });
+    public GelenSiparisDTO MapIncomingOrder(long id, GelenSiparisEslemeRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        var incoming = _incomingOrders.FirstOrDefault(o => o.KayitNo == id)
+            ?? throw new ApiException(404, "Gelen sipariş bulunamadı.");
+        Require(incoming.PaketSiparisNo is null, "Aktarılmış sipariş değiştirilemez.", 409);
+        Require(_menu.SelectMany(c => c.Urunler).Any(p => p.KayitNo == request.StokKayitNo && p.Aktif),
+            "Aktif ürün bulunamadı.", 404);
+        incoming.EslesenStokKayitNo = request.StokKayitNo;
+        return incoming;
+    });
+    public GelenSiparisDTO TransferIncomingOrder(long id, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        var incoming = _incomingOrders.FirstOrDefault(o => o.KayitNo == id)
+            ?? throw new ApiException(404, "Gelen sipariş bulunamadı.");
+        if (incoming.PaketSiparisNo.HasValue) return incoming;
+        var productId = incoming.EslesenStokKayitNo ?? throw new ApiException(409, "Önce ürünü eşleştirin.");
+        var delivery = CreateDelivery(new PaketSiparisEkleRequest { IdempotencyKey = Guid.NewGuid().ToString(),
+            MusteriAdi = incoming.MusteriAdi, Telefon = incoming.Telefon, Adres = incoming.Adres,
+            OdemeSekli = incoming.OdemeSekli,
+            Satirlar = [new PaketSiparisSatirIstek { StokKayitNo = productId, Miktar = incoming.Miktar }] }, actor);
+        incoming.PaketSiparisNo = delivery.KayitNo;
+        Log(actor, "Entegrasyon siparişi aktarıldı", $"{incoming.Kaynak} #{incoming.HariciSiparisNo} → paket #{delivery.KayitNo}");
+        return incoming;
     });
     public AdisyonBaslikDTO? Receipt(long tableId) => Read(() => { Table(tableId); return Open(tableId); });
 
@@ -626,12 +751,37 @@ public sealed class RestaurantRepository
         return _kitchenEvents.Where(item => !item.Goruldu).OrderBy(item => item.KayitNo).ToList();
     });
 
+    public MutfakBildirimDTO RequestKitchenPrint(long id, StaffActor actor) => Change(() =>
+    {
+        Permission(actor, StaffOperation.Kitchen);
+        var item = _kitchenEvents.FirstOrDefault(e => e.KayitNo == id)
+            ?? throw new ApiException(404, "Mutfak bildirimi bulunamadı.");
+        Require(!item.Goruldu, "Kapatılmış bildirim yazdırılamaz.", 409);
+        Require(item.YazdirmaDurumu is MutfakYazdirmaDurumu.Bekliyor or MutfakYazdirmaDurumu.Hatali,
+            "Bu bildirim yeniden yazdırılamaz.", 409);
+        item.YazdirmaDenemesi++;
+        item.YazdirmaDurumu = MutfakYazdirmaDurumu.KontrolBekliyor;
+        return item;
+    });
+    public MutfakBildirimDTO FinishKitchenPrint(long id, MutfakYazdirmaSonucRequest request, StaffActor actor) => Change(() =>
+    {
+        Permission(actor, StaffOperation.Kitchen);
+        var item = _kitchenEvents.FirstOrDefault(e => e.KayitNo == id)
+            ?? throw new ApiException(404, "Mutfak bildirimi bulunamadı.");
+        Require(!item.Goruldu && item.YazdirmaDurumu == MutfakYazdirmaDurumu.KontrolBekliyor,
+            "Sonuç bekleyen yazdırma denemesi yok.", 409);
+        item.YazdirmaDurumu = request.Basarili ? MutfakYazdirmaDurumu.Tamamlandi : MutfakYazdirmaDurumu.Hatali;
+        return item;
+    });
+
     public MutfakBildirimDTO AcknowledgeKitchenEvent(long id, StaffActor actor) => Change(() =>
     {
         Permission(actor, StaffOperation.Kitchen);
         var item = _kitchenEvents.FirstOrDefault(e => e.KayitNo == id)
             ?? throw new ApiException(404, "Mutfak bildirimi bulunamadı.");
         Require(!item.Goruldu, "Bildirim zaten görüldü.", 409);
+        Require(item.YazdirmaDurumu == MutfakYazdirmaDurumu.Tamamlandi,
+            "Önce çıktının alındığını doğrulayın.", 409);
         item.Goruldu = true;
         return item;
     });
@@ -667,6 +817,8 @@ public sealed class RestaurantRepository
         var meal = payments.Sum(item => item.YemekKarti);
         var account = payments.Sum(item => item.Cari);
         var sales = closed.Sum(r => r.GenelToplam - (r.IndirimToplam ?? 0));
+        var delivered = _deliveries.Where(d => d.TamamlanmaTarihi.HasValue && BusinessDate(d.TamamlanmaTarihi.Value) == date).ToList();
+        var deliverySales = delivered.Sum(d => d.GenelToplam);
         return new GunlukRaporDTO {
             IsletmeTarihi = date, Bugun = BusinessToday, BaslangicSaati = _businessDayStartHour,
             VardiyaKapanisi = _shiftClosings.GetValueOrDefault(date),
@@ -675,6 +827,10 @@ public sealed class RestaurantRepository
             NakitToplam = closed.Sum(r => r.NakitToplam ?? 0), BankaToplam = closed.Sum(r => r.BankaToplam ?? 0),
             CariToplam = closed.Sum(r => r.CariToplam ?? 0), YemekKartiToplam = closed.Sum(r => r.YemekKartiToplam ?? 0),
             IndirimToplam = closed.Sum(r => r.IndirimToplam ?? 0),
+            PaketCiro = deliverySales, TeslimEdilenPaket = delivered.Count,
+            IptalEdilenPaket = _deliveries.Count(d => d.IptalTarihi.HasValue && BusinessDate(d.IptalTarihi.Value) == date),
+            AcikPaket = _deliveries.Count(d => d.Durum is not (PaketDurum.TeslimEdildi or PaketDurum.Iptal) && BusinessDate(d.KayitTarihi) == date),
+            GenelSatis = sales + deliverySales,
             SaatlikCiro = closed.GroupBy(r => RestaurantTime(_closedAt[r.KayitNo]).Hour).OrderBy(g => g.Key).Select(g =>
                 new SaatlikCiroDTO { Saat = g.Key, Ciro = g.Sum(r => r.GenelToplam - (r.IndirimToplam ?? 0)), AdisyonSayisi = g.Count() }).ToList(),
             EnCokSatan = closed.SelectMany(r => r.Detaylar).GroupBy(d => d.StokKayitNo).Select(g => new UrunSatisDTO {
