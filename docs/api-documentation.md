@@ -9,7 +9,11 @@ Install/use a .NET 10 SDK, then from this API directory:
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
 foreach ($role in 'Waiter','Kitchen') {
-    $password = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+    $bytes = New-Object byte[] 24
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($bytes)
+    $rng.Dispose()
+    $password = [Convert]::ToBase64String($bytes)
     Set-Item -Path "Env:Demo__$($role)Password" -Value $password
     Write-Host "$role password: $password"
 }

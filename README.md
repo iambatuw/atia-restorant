@@ -54,11 +54,17 @@ Yeni siparişte müşteri ve teslimat bilgileriyle ürünleri girersiniz. Sipari
 
 Gerekenler: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). Depodaki derlenmiş arayüz `wwwroot` altında bulunduğu için yalnızca uygulamayı açacaksanız Node.js gerekmez.
 
+Windows'ta [AtiaBaslat.bat](AtiaBaslat.bat) dosyasına çift tıklayın. Dosya garson ve mutfak parolalarını oluşturur, sunucuyu başlatır ve hazır olduğunda giriş sayfasını tarayıcıda açar. Parolalar açılan komut penceresinde görünür; sunucu aynı pencere açık kaldığı sürece çalışır.
+
 Depo kökünde:
 
 ```powershell
 foreach ($role in 'Waiter','Kitchen') {
-    $password = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+    $bytes = New-Object byte[] 24
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($bytes)
+    $rng.Dispose()
+    $password = [Convert]::ToBase64String($bytes)
     Set-Item -Path "Env:Demo__$($role)Password" -Value $password
     Write-Host "$role parolası: $password"
 }
