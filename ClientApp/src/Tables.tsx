@@ -40,9 +40,10 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
   const [section,setSection]=useState<number|null>(null);
   const [status,setStatus]=useState('all');
   const [search,setSearch]=useState('');
+  const [pickerTable,setPickerTable]=useState<number|null>(null);
   const selectedRoute=tableRouteFromPath(path);
   const selected=selectedRoute?.tableId??null;
-  const picker=!!selectedRoute?.picker;
+  const picker=!!selectedRoute?.picker||(selected!==null&&pickerTable===selected);
 
   const table=tables.data?.find(t=>t.MasaId===selected);
   const visible=(tables.data??[]).filter(t=>
@@ -56,7 +57,6 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
   if (selected!==null&&!table) return (
     <section className="op-page"><ErrorBox error={tables.error} retry={()=>void tables.refetch()}/>{tables.isPending?<Loading/>:!tables.error&&<Empty>Masa bulunamadı. <button className="secondary" onClick={()=>navigate('/app/masalar')}>Masalara dön</button></Empty>}</section>
   );
-  if (picker&&table) return <TableProductPicker table={table} onClose={()=>navigate(tablePath(table.MasaId))}/>;
   return (
     <section className={`op-page op-floor-page ${table?'has-table':''}`} aria-label="Masalar">
       <header className="op-page-head"><div><h1>Masalar</h1><p>Salonun anlık durumu ve açık adisyonlar</p></div><div className="op-head-count"><strong>{occupied}</strong><span>dolu</span><strong>{available}</strong><span>boş</span></div></header>
@@ -94,8 +94,9 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
         </section>
         {table?(
           <TableOrder key={table.MasaId} table={table} admin={session.Rol==='Admin'} allTables={tables.data??[]}
-            close={()=>navigate('/app/masalar')}
-            onOpenPicker={()=>navigate(tablePath(table.MasaId,true))}/>
+            close={()=>{setPickerTable(null);navigate('/app/masalar');}} picker={picker}
+            onOpenPicker={()=>setPickerTable(table.MasaId)}
+            onClosePicker={()=>{setPickerTable(null);if(selectedRoute?.picker)navigate(tablePath(table.MasaId));}}/>
         ):(
           <aside className="op-check-placeholder"><ReceiptText size={28}/><h2>Adisyon</h2><p>Siparişleri görmek veya yeni adisyon açmak için bir masa seçin.</p></aside>
         )}
@@ -108,7 +109,7 @@ function minutes(date:string|null){
   return date?Math.max(0,Math.floor((Date.now()-new Date(date).getTime())/60000)):0;
 }
 
-function TableOrder({table,admin,allTables,close,onOpenPicker}:{table:Table;admin:boolean;allTables:Table[];close:()=>void;onOpenPicker:()=>void}){
+function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePicker}:{table:Table;admin:boolean;allTables:Table[];close:()=>void;picker:boolean;onOpenPicker:()=>void;onClosePicker:()=>void}){
   const client=useQueryClient();
   const [payment,setPayment]=useState(false);
   const [transfer,setTransfer]=useState(false);
@@ -158,6 +159,7 @@ function TableOrder({table,admin,allTables,close,onOpenPicker}:{table:Table;admi
   };
 
   return (
+    <>
     <aside className="order-panel guest-check-panel fresh-check">
       <header className="fresh-check-heading">
         <div>
@@ -341,6 +343,8 @@ function TableOrder({table,admin,allTables,close,onOpenPicker}:{table:Table;admi
         <MergeModal receipt={order} table={table} allTables={allTables} onClose={()=>setMerge(false)}/>
       )}
     </aside>
+    {picker&&<TableProductPicker table={table} onClose={onClosePicker}/>}
+    </>
   );
 }
 
@@ -401,12 +405,7 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
     onClose();
   };
 
-  return <section className="op-page table-product-page" aria-label={`${table.MasaAdi} için ürün ekle`}>
-    <header className="op-product-head">
-      <button type="button" className="secondary op-product-back" disabled={confirm.isPending} onClick={closePicker}><ArrowLeft size={20}/> Adisyona dön</button>
-      <div><p>{table.RestorantBolumAdi} · {table.MasaAdi}</p><h1>Menüden ürün ekle</h1></div>
-    </header>
-    <div className="table-product-workspace">
+  return <Modal title={`${table.MasaAdi} · Ürün ekle`} className="table-product-dialog" onClose={closePicker} preventClose={confirm.isPending}>
     <div className="table-product-meta"><span>{table.RestorantBolumAdi} masası</span><span>Ürünleri seçin, sonra onaylayın</span></div>
     <div className="table-product-tools">
       <label className="table-product-search"><Search size={20}/><input type="search" placeholder="Ürün ara" aria-label="Ürün ara" value={search} onChange={event=>{setSearch(event.target.value);setPortionProduct(null);}}/></label>
@@ -438,8 +437,7 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
     </section>}
     {confirmDiscard&&<div className="table-product-discard" role="alert"><span>{draftAmount} adet henüz kaydedilmedi. Seçimi silip adisyona dönmek istiyor musunuz?</span><button type="button" onClick={()=>setConfirmDiscard(false)}>Seçime devam et</button><button type="button" onClick={onClose}>Seçimi sil ve dön</button></div>}
     <div className="table-product-footer"><span role="status" aria-live="polite">{confirm.isPending?'Sipariş kaydediliyor…':draft.length>=50?'En fazla 50 ürün satırı seçilebilir.':draft.length?`${draftAmount} adet onay bekliyor`:lastAdded||`${added} adet eklendi · Ürün seçin, sonra onaylayın.`}</span><div className="table-product-footer-actions"><button type="button" className="secondary" disabled={confirm.isPending} onClick={closePicker}>{draft.length?'Seçimi bırak ve dön':'Adisyona dön'}</button><button type="button" className="primary" disabled={draft.length===0||confirm.isPending} onClick={()=>confirm.mutate(draft)}>Onayla ve ekle</button></div></div>
-    </div>
-  </section>;
+  </Modal>;
 }
 
 // ───── MASA AYIRMA MODALI ─────

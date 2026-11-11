@@ -11,17 +11,16 @@ const table:Table={MasaId:12,MasaAdi:'Masa 12',MasaKodu:'12',RestorantBolumuKayi
 const session:Session={Token:'demo',KullaniciAdi:'garson',Rol:'Garson',KullaniciId:2,TamAd:'Demo Garson'};
 
 describe('table product route',()=>{
-  it('renders the product picker as its own page without the table panel or a dialog',()=>{
+  it('keeps the selected table and its receipt behind the product picker',()=>{
     const client=new QueryClient();
     client.setQueryData(['tables'],[table]);
     client.setQueryData(['sections'],[]);
     const html=renderToStaticMarkup(createElement(QueryClientProvider,{client},
       createElement(Tables,{session,path:'/app/masalar/12/urun-ekle',navigate:()=>{}})));
 
-    expect(html).toContain('aria-label="Masa 12 için ürün ekle"');
-    expect(html).toContain('Menüden ürün ekle');
+    expect(html).toContain('aria-label="Masalar"');
+    expect(html).toContain('class="order-panel guest-check-panel fresh-check"');
+    expect(html).toMatch(/<dialog[^>]*class="table-product-dialog"/);
     expect(html).toContain('Onayla ve ekle');
-    expect(html).not.toContain('order-panel');
-    expect(html).not.toContain('<dialog');
   });
 });

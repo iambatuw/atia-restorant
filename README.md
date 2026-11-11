@@ -17,6 +17,8 @@ Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük ra
 
 ![Günlük rapordaki vardiya kapanışı](docs/screenshots/vardiya-kapanisi.png)
 
+![Tablette masa üzerinde açılan ürün seçici](docs/screenshots/urun-secici-tablet.png)
+
 ## Bugün neler çalışıyor?
 
 | Alan | Demo ortamında yapabilecekleriniz | Sınır |
@@ -32,7 +34,7 @@ Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük ra
 
 ### Masadan ödemeye
 
-Garson veya yönetici masayı seçip **Menüden ürün ekle** ile ayrı ürün seçme sayfasına gider. Tablet ve dokunmatik bilgisayarda kategori, arama, adet, porsiyon ve sipariş notu bu sayfadan kullanılır. Seçilen ürünler önce onay listesine alınır; yanlış seçimler listeden silinebilir. **Onayla ve ekle** işleminden önce ürünler adisyona yazılmaz. Onaydan sonra sayfa açık kalır; aynı masaya başka ürünler eklenebilir veya adisyona dönülebilir. Kaydedilmemiş seçimle çıkışta onay istenir. Yönetici gerektiğinde ürün ikramını işaretler, adisyonu başka masaya taşır, ayırır veya birleştirir. Zayi işlemi yalnızca yönetici **Ayarlar** sayfasından etkinleştirdiğinde görünür.
+Garson veya yönetici masayı seçip menüden ürün ekleyebilir. Ürün seçici masa ekranının üzerinde açılır; tablet ve dokunmatik bilgisayarda kategori, arama, adet, porsiyon ve sipariş notu aynı panelden kullanılır. Seçilen ürünler onay bekler; **Onayla ve ekle** işleminden sonra panel açık kalır, böylece aynı masaya başka ürünler de girilebilir. Yönetici gerektiğinde ürün ikramını işaretler, adisyonu başka masaya taşır, ayırır veya birleştirir.
 
 Ödeme ekranı nakit, banka kartı, yemek kartı, cari ve indirim tutarlarını ayrı alır. Kısmi ödeme yapılırsa kalan tutar adisyonda görünür; tutar tamamlandığında adisyon kapanır. Sunucu ürün fiyatını ve ödeme toplamını denetler. Hugin S1 ve PayGo seçimi, gerçek cihazla konuşan bir bağlantı değil, işlem durumlarını denemek için hazırlanmış simülasyondur.
 
