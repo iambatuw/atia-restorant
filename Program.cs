@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using AtiaRestorant.API.Data;
+using AtiaRestorant.API.Endpoints;
 using AtiaRestorant.API.Hubs;
 using AtiaRestorant.API.Models;
 using AtiaRestorant.API.Services;
@@ -40,6 +41,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         {
             if (context.Request.Path.StartsWithSegments("/hubs/restorant") &&
                 context.Request.Query.TryGetValue("access_token", out var token)) context.Token = token;
+            return Task.CompletedTask;
+        },
+        // A signed token is not enough: the account must still be active, keep the same role and
+        // security version (password/role changes sign out), and belong to this store.
+        OnTokenValidated = context =>
+        {
+            var principal = context.Principal!;
+            var repository = context.HttpContext.RequestServices.GetRequiredService<RestaurantRepository>();
+            if (!int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ||
+                !int.TryParse(principal.FindFirstValue(AuthService.VersionClaim), out var version) ||
+                principal.FindFirstValue(AuthService.StoreClaim) != repository.StoreId.ToString(CultureInfo.InvariantCulture) ||
+                !repository.IsStaffTokenValid(id, principal.FindFirstValue(ClaimTypes.Role) ?? "", version))
+                context.Fail("Oturum artık geçerli değil.");
             return Task.CompletedTask;
         }
     };
@@ -118,13 +132,16 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 var api = app.MapGroup("/api").RequireAuthorization("Staff");
-api.MapGet("/health", () => Results.Ok(ApiResult.Ok(new { Mode = mode.Name, DatabaseReady = false }))).AllowAnonymous();
+api.MapGet("/health", (RestaurantRepository repository) => Results.Ok(ApiResult.Ok(new { Mode = mode.Name, DatabaseReady = false,
+    KaliciDemo = mode.IsDemo && repository.IsPersistent }))).AllowAnonymous();
 api.MapPost("/auth/login", (LoginRequest request, AuthService auth) => Results.Ok(ApiResult<LoginResponse>.Ok(auth.Login(request))))
     .AllowAnonymous().RequireRateLimiting("login");
-api.MapGet("/auth/session", (ClaimsPrincipal user) => Results.Ok(ApiResult.Ok(new {
+api.MapGet("/auth/session", (ClaimsPrincipal user, RestaurantRepository repository) => Results.Ok(ApiResult.Ok(new {
     KullaniciId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!),
     TamAd = user.FindFirstValue(ClaimTypes.Name)!,
-    Rol = user.FindFirstValue(ClaimTypes.Role)!
+    Rol = user.FindFirstValue(ClaimTypes.Role)!,
+    MagazaKayitNo = repository.StoreId,
+    MagazaAdi = repository.Settings().Isletme.Unvan
 })));
 api.MapGet("/menu", (RestaurantRepository repository) => Results.Ok(ApiResult<List<MenuKategoriDTO>>.Ok(repository.Menu()))).AllowAnonymous();
 api.MapGet("/menu/yonetim", (ClaimsPrincipal user, RestaurantRepository repository) =>
@@ -245,6 +262,7 @@ api.MapPost("/rezervasyonlar", (RezervasyonEkleRequest request, ClaimsPrincipal 
 api.MapDelete("/rezervasyonlar/{id:long}", (long id, ClaimsPrincipal user, RestaurantRepository repository,
     IHubContext<RestorantHub> hub, ILoggerFactory logs) => Mutate(() => repository.DeleteReservation(id, Actor(user)), hub, logs))
     .RequireAuthorization("Admin");
+api.MapOperationsEndpoints();
 app.MapHub<RestorantHub>("/hubs/restorant").RequireAuthorization("Staff");
 app.MapFallbackToFile("{*path:regex(^(?!api|hubs).*$)}", "index.html");
 app.Run();

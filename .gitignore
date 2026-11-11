@@ -33,3 +33,6 @@ coverage/
 Thumbs.db
 [Dd]esktop.ini
 .DS_Store
+
+# Yerel demo verisi (müşteri ve adisyon kayıtları içerebilir)
+App_Data/

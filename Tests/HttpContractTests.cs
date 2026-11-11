@@ -28,7 +28,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(new TestRemoteAddressFilter(_remoteAddress)));
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Demo:Enabled"] = "true", ["JwtSettings:SecretKey"] = "test-only-generated-config-key-32-bytes-minimum"
+            ["Demo:Enabled"] = "true", ["Demo:StatePath"] = "", ["JwtSettings:SecretKey"] = "test-only-generated-config-key-32-bytes-minimum"
         }));
     }
 }
@@ -360,7 +360,7 @@ public sealed class HttpContractTests
         var valid = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
             ["JwtSettings:SecretKey"] = "production-test-configuration-at-least-32-bytes" }).Build();
         var config = JwtConfiguration.Load(valid, production, new(false));
-        var auth = new AuthService(new(false), production, config, TimeProvider.System);
+        var auth = new AuthService(new(false), production, config, TimeProvider.System, new RestaurantRepository(new(false), TimeProvider.System));
         Assert.Equal(503, Assert.Throws<ApiException>(() => auth.Login(new() { KullaniciAdi = "admin", Sifre = "demo123" })).Status);
         var dev = new FakeEnvironment { EnvironmentName = Environments.Development };
         Assert.NotEqual(JwtConfiguration.Load(empty, dev, new(true)).Key, JwtConfiguration.Load(empty, dev, new(true)).Key);

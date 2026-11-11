@@ -59,6 +59,11 @@ public class AdisyonDetayDTO
     public bool Yazdirildi => (YazdirilanMiktar ?? 0) >= Miktar;
     public bool StokEkstra { get; set; }
     public string? StokEkstraAdi { get; set; }
+    public int KdvOrani { get; set; } = 10;
+    public List<SatirSecimDTO> Secimler { get; set; } = new();
+    public string? SecimMetni => Secimler.Count == 0 ? null : string.Join(", ", Secimler.Select(s => s.SecenekAdi));
+    public decimal OdenenMiktar { get; set; }
+    public decimal OdenenTutar { get; set; }
 }
 
 public class AdisyonBaslikDTO
@@ -79,6 +84,12 @@ public class AdisyonBaslikDTO
     public int KisiSayisi { get; set; }
     public bool Kapali { get; set; }
     public List<AdisyonDetayDTO> Detaylar { get; set; } = new();
+    public List<KdvSatiriDTO> KdvDokumu { get; set; } = new();
+    public List<IadeKaydiDTO> Iadeler { get; set; } = new();
+    public decimal IadeToplam => Iadeler.Sum(i => i.Toplam);
+    public int YazdirmaSayisi { get; set; }
+    public long? YemekKartiKayitNo { get; set; }
+    public string? YemekKartiAdi { get; set; }
 }
 
 // ───── SİPARİŞ EKLEME ─────
@@ -94,6 +105,7 @@ public class SiparisEkleRequest
     public int? PersonelKayitNo { get; set; }
     public bool StokEkstra { get; set; }
     public string? StokEkstraAdi { get; set; }
+    public List<int> SecenekKayitNolar { get; set; } = [];
 }
 
 public class TopluSiparisEkleRequest
@@ -105,6 +117,10 @@ public class TopluSiparisEkleRequest
 public class RestoranAyarlariDTO
 {
     public bool ZayiAktif { get; set; }
+    public IsletmeBilgisiDTO Isletme { get; set; } = new();
+    public List<string> HazirNotlar { get; set; } = new();
+    public List<YaziciDTO> Yazicilar { get; set; } = new();
+    public List<YemekKartiDTO> YemekKartlari { get; set; } = new();
 }
 
 public class ZayiAyariRequest
@@ -140,6 +156,8 @@ public class MutfakBildirimDTO
     public bool Goruldu { get; set; }
     public int YazdirmaDenemesi { get; set; }
     public MutfakYazdirmaDurumu YazdirmaDurumu { get; set; }
+    public long? YaziciKayitNo { get; set; }
+    public string? YaziciAdi { get; set; }
 }
 public enum MutfakYazdirmaDurumu { Bekliyor, KontrolBekliyor, Tamamlandi, Hatali }
 public class MutfakYazdirmaSonucRequest
@@ -159,6 +177,9 @@ public class OdemeRequest
     public int? OdemePersonelKayitNo { get; set; }
     public bool KismiOdeme { get; set; }
     public string? PosIslemId { get; set; }
+    /// <summary>Optional item-based payment: the server calculates the amount from these lines.</summary>
+    public List<AyrilanSatir>? OdenenSatirlar { get; set; }
+    public long? YemekKartiKayitNo { get; set; }
 }
 
 // ───── POS CİHAZ ENTEGRASYONU & DURUM MAKİNESİ ─────
@@ -262,6 +283,10 @@ public class MenuUrunDTO
     public string? GrupAdi { get; set; }
     public bool Aktif { get; set; }
     public List<PorsiyonDTO> Porsiyonlar { get; set; } = new();
+    public int KdvOrani { get; set; } = 10;
+    public string? Barkod { get; set; }
+    public List<SecenekGrubuDTO> SecenekGruplari { get; set; } = new();
+    public List<ReceteSatiriDTO> Recete { get; set; } = new();
 }
 
 public class MenuKategoriYazRequest
@@ -275,6 +300,9 @@ public class MenuUrunYazRequest
     public decimal SatisFiyati { get; set; }
     public bool Aktif { get; set; } = true;
     public List<PorsiyonDTO> Porsiyonlar { get; set; } = [];
+    public int KdvOrani { get; set; } = 10;
+    public string? Barkod { get; set; }
+    public List<SecenekGrubuDTO>? SecenekGruplari { get; set; }
 }
 
 public class PorsiyonDTO
@@ -282,6 +310,8 @@ public class PorsiyonDTO
     public int KayitNo { get; set; }
     public string? PorsiyonAdi { get; set; }
     public decimal Fiyat { get; set; }
+    /// <summary>Recipe multiplier relative to the full product (for example 0.6 for a half portion).</summary>
+    public decimal Carpan { get; set; } = 1;
 }
 
 public enum PaketDurum { Yeni, Hazirlaniyor, Yolda, TeslimEdildi, Iptal }
@@ -295,6 +325,9 @@ public class PaketSiparisSatirDTO
     public int Miktar { get; set; }
     public decimal BirimFiyat { get; set; }
     public decimal SatirTutari { get; set; }
+    public int KdvOrani { get; set; } = 10;
+    public List<SatirSecimDTO> Secimler { get; set; } = new();
+    public string? SecimMetni => Secimler.Count == 0 ? null : string.Join(", ", Secimler.Select(s => s.SecenekAdi));
 }
 
 public class PaketSiparisDTO
@@ -312,6 +345,11 @@ public class PaketSiparisDTO
     public List<PaketSiparisSatirDTO> Satirlar { get; set; } = new();
     public DateTime? TamamlanmaTarihi { get; set; }
     public DateTime? IptalTarihi { get; set; }
+    public long? MusteriKayitNo { get; set; }
+    public long? KuryeKayitNo { get; set; }
+    public bool TahsilEdildi { get; set; }
+    public DateTime? TahsilatTarihi { get; set; }
+    public string? TahsilEden { get; set; }
 }
 
 public class GelenSiparisDTO
@@ -350,6 +388,7 @@ public class PaketSiparisSatirIstek
     public long StokKayitNo { get; set; }
     public int? PorsiyonKayitNo { get; set; }
     public int Miktar { get; set; }
+    public List<int> SecenekKayitNolar { get; set; } = [];
 }
 
 public class PaketSiparisEkleRequest
@@ -367,6 +406,7 @@ public class PaketDurumRequest
 {
     public PaketDurum Durum { get; set; }
     public string? Kurye { get; set; }
+    public long? KuryeKayitNo { get; set; }
 }
 
 // ───── MUTFAK (KDS) ─────
@@ -393,6 +433,8 @@ public class MutfakSatirDTO
     public string? SatirAciklama { get; set; }
     public string? PersonelAdi { get; set; }
     public bool Hazir => KalanMiktar <= 0;
+    public string? SecimMetni { get; set; }
+    public long? YaziciKayitNo { get; set; }
 }
 
 // ───── GARSON / PERSONEL ─────
@@ -478,6 +520,11 @@ public class GunlukRaporDTO
     public int IptalEdilenPaket { get; set; }
     public int AcikPaket { get; set; }
     public decimal GenelSatis { get; set; }
+    public List<KdvSatiriDTO> KdvDokumu { get; set; } = new();
+    public List<YemekKartiOzetDTO> YemekKartiDagilimi { get; set; } = new();
+    public PaketTahsilatDTO PaketTahsilat { get; set; } = new();
+    public List<KuryeOzetDTO> KuryeOzeti { get; set; } = new();
+    public decimal BeklenenKasaNakdi { get; set; }
 }
 
 public class VardiyaKapanisRequest
@@ -514,6 +561,8 @@ public class IslemKaydiDTO
     public decimal YemekKarti { get; set; }
     public decimal Cari { get; set; }
     public decimal Indirim { get; set; }
+    public long? YemekKartiKayitNo { get; set; }
+    public string? YemekKartiAdi { get; set; }
 }
 
 public class GunlukMutabakatDTO
@@ -531,6 +580,7 @@ public class GunlukMutabakatDTO
     public decimal ZayiTutari { get; set; }
     public decimal IkramTutari { get; set; }
     public int OdemeSayisi { get; set; }
+    public decimal IadeTutari { get; set; }
 }
 
 public class SaatlikCiroDTO
@@ -561,4 +611,6 @@ public class LoginResponse
     public string Rol { get; set; } = "";
     public int KullaniciId { get; set; }
     public string TamAd { get; set; } = "";
+    public long MagazaKayitNo { get; set; }
+    public string MagazaAdi { get; set; } = "";
 }
