@@ -32,7 +32,7 @@ Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük ra
 
 ### Masadan ödemeye
 
-Garson veya yönetici masayı seçip menüden ürün ekleyebilir. Ürün seçici masa ekranının üzerinde açılır; tablet ve dokunmatik bilgisayarda kategori, arama, adet, porsiyon ve sipariş notu aynı panelden kullanılır. Her ürün eklendiğinde panel açık kalır, böylece birden fazla ürün art arda girilebilir. Yönetici gerektiğinde ürün ikramını işaretler, adisyonu başka masaya taşır, ayırır veya birleştirir.
+Garson veya yönetici masayı seçip menüden ürün ekleyebilir. Ürün seçici masa ekranının üzerinde açılır; tablet ve dokunmatik bilgisayarda kategori, arama, adet, porsiyon ve sipariş notu aynı panelden kullanılır. Seçilen ürünler onay bekler; **Onayla ve ekle** işleminden sonra panel açık kalır, böylece aynı masaya başka ürünler de girilebilir. Yönetici gerektiğinde ürün ikramını işaretler, adisyonu başka masaya taşır, ayırır veya birleştirir.
 
 Ödeme ekranı nakit, banka kartı, yemek kartı, cari ve indirim tutarlarını ayrı alır. Kısmi ödeme yapılırsa kalan tutar adisyonda görünür; tutar tamamlandığında adisyon kapanır. Sunucu ürün fiyatını ve ödeme toplamını denetler. Hugin S1 ve PayGo seçimi, gerçek cihazla konuşan bir bağlantı değil, işlem durumlarını denemek için hazırlanmış simülasyondur.
 

@@ -359,6 +359,9 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
   const [note,setNote]=useState('');
   const [portionProduct,setPortionProduct]=useState<Product|null>(null);
   const [draft,setDraft]=useState<DraftProduct[]>([]);
+  const [added,setAdded]=useState(0);
+  const [lastAdded,setLastAdded]=useState('');
+  const [confirmDiscard,setConfirmDiscard]=useState(false);
   const nextDraftId=useRef(0);
   const confirm=useMutation({
     mutationFn:(lines:DraftProduct[])=>api<Receipt>('/siparisler/toplu',{
@@ -367,12 +370,16 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
         Miktar:line.amount,SatirAciklama:line.note
       }))})
     }),
-    onSuccess:async()=>{
+    onSuccess:async(_,lines)=>{
       await Promise.all([
         client.invalidateQueries({queryKey:['receipt',table.MasaId]}),
         client.invalidateQueries({queryKey:['tables']})
       ]);
-      onClose();
+      const amount=lines.reduce((total,line)=>total+line.amount,0);
+      setAdded(total=>total+amount);
+      setLastAdded(`${amount} adet adisyona eklendi. Yeni ürün seçebilirsiniz.`);
+      setDraft([]);
+      setConfirmDiscard(false);
     }
   });
   const categories=menu.data??[];
@@ -383,6 +390,8 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
   const select=(product:Product,portionId?:number)=>{
     if(confirm.isPending||draft.length>=50)return;
     confirm.reset();
+    setConfirmDiscard(false);
+    setLastAdded('');
     if(product.Porsiyonlar.length>0&&portionId===undefined){setPortionProduct(product);return;}
     const portion=product.Porsiyonlar.find(item=>item.KayitNo===portionId);
     setDraft(lines=>[...lines,{id:++nextDraftId.current,product,portionId,portionName:portion?.PorsiyonAdi,amount:quantity,note:note.trim()}]);
@@ -391,8 +400,12 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
     setQuantity(1);
   };
   const draftAmount=draft.reduce((total,line)=>total+line.amount,0);
+  const closePicker=()=>{
+    if(draft.length>0){setConfirmDiscard(true);return;}
+    onClose();
+  };
 
-  return <Modal title={`${table.MasaAdi} · Ürün ekle`} className="table-product-dialog" onClose={onClose} preventClose={confirm.isPending}>
+  return <Modal title={`${table.MasaAdi} · Ürün ekle`} className="table-product-dialog" onClose={closePicker} preventClose={confirm.isPending}>
     <div className="table-product-meta"><span>{table.RestorantBolumAdi} masası</span><span>Ürünleri seçin, sonra onaylayın</span></div>
     <div className="table-product-tools">
       <label className="table-product-search"><Search size={20}/><input type="search" placeholder="Ürün ara" aria-label="Ürün ara" value={search} onChange={event=>{setSearch(event.target.value);setPortionProduct(null);}}/></label>
@@ -419,10 +432,11 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
       <div className="table-product-draft-head"><strong>Onay bekleyenler</strong><span>{draftAmount} adet · henüz adisyona eklenmedi</span></div>
       <div className="table-product-draft-list">{draft.map(line=><div className="table-product-draft-row" key={line.id}>
         <div><strong>{line.amount} × {line.product.StokAdi}{line.portionName?` · ${line.portionName}`:''}</strong>{line.note&&<small>Not: {line.note}</small>}</div>
-        <button type="button" className="secondary" disabled={confirm.isPending} aria-label={`${line.product.StokAdi} seçimini sil`} onClick={()=>{confirm.reset();setDraft(lines=>lines.filter(item=>item.id!==line.id));}}><Trash2 size={18}/> Sil</button>
+        <button type="button" className="secondary" disabled={confirm.isPending} aria-label={`${line.product.StokAdi} seçimini sil`} onClick={()=>{confirm.reset();setConfirmDiscard(false);setDraft(lines=>lines.filter(item=>item.id!==line.id));}}><Trash2 size={18}/> Sil</button>
       </div>)}</div>
     </section>}
-    <div className="table-product-footer"><span role="status" aria-live="polite">{confirm.isPending?'Sipariş kaydediliyor…':draft.length>=50?'En fazla 50 ürün satırı seçilebilir.':draft.length?`${draftAmount} adet onay bekliyor`:'Ürün seçin; onaylamadan kaydedilmez.'}</span><button type="button" className="primary" disabled={draft.length===0||confirm.isPending} onClick={()=>confirm.mutate(draft)}>Onayla ve ekle</button></div>
+    {confirmDiscard&&<div className="table-product-discard" role="alert"><span>{draftAmount} adet henüz kaydedilmedi. Seçimi silip adisyona dönmek istiyor musunuz?</span><button type="button" onClick={()=>setConfirmDiscard(false)}>Seçime devam et</button><button type="button" onClick={onClose}>Seçimi sil ve dön</button></div>}
+    <div className="table-product-footer"><span role="status" aria-live="polite">{confirm.isPending?'Sipariş kaydediliyor…':draft.length>=50?'En fazla 50 ürün satırı seçilebilir.':draft.length?`${draftAmount} adet onay bekliyor`:lastAdded||`${added} adet eklendi · Ürün seçin, sonra onaylayın.`}</span><div className="table-product-footer-actions"><button type="button" className="secondary" disabled={confirm.isPending} onClick={closePicker}>{draft.length?'Seçimi bırak ve dön':'Adisyona dön'}</button><button type="button" className="primary" disabled={draft.length===0||confirm.isPending} onClick={()=>confirm.mutate(draft)}>Onayla ve ekle</button></div></div>
   </Modal>;
 }
 
