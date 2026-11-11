@@ -1,9 +1,22 @@
 # ATIA web projesinde çalışma düzeni
 
-- Her işe başlamadan önce `origin/main` dalını getir; yerel commit, uzak commit ve `git status` durumunu karşılaştır. Kullanıcının açık değişikliklerini koru.
-- Başka birinin commit'i aynı ekranı değiştirdiyse önce farkı incele. Var olan çalışan akışı sessizce geri alma; yeni davranışı önceki davranışla birleştir veya değişen tercihi kullanıcıya açıkça anlat.
+Bu kurallar depoda çalışan bütün kod ajanları için geçerlidir. Farklı bilgisayarlardaki kopyalar aynı anda değişebilir; yerel dosyaları veya uzak depoyu tek başına bütün çalışmanın kaynağı sayma.
+
+## Her işe başlamadan önce
+
+1. `git status --short --branch` ile açık değişiklikleri incele. Başkasının veya kullanıcının değişikliklerini kaydet, silme ya da kendi commit'ine katma.
+2. `git fetch origin main` çalıştır. `git log --oneline --left-right HEAD...origin/main` ve `git diff --name-status HEAD..origin/main` ile yerel ve uzak commit'leri karşılaştır.
+3. Uzak `main` ilerideyse, kendi işine başlamadan önce yeni commit'leri mevcut çalışmana dahil et. Temiz dalda hızlı ileri güncelleme yap; açık değişiklik varsa önce güvenle koru ve çakışmaları tek tek çöz. Dallar ayrıştıysa commit'leri birleştir veya yeniden temellendir. Eski klasörü yeni klasörün üzerine topluca kopyalama.
+
+## Değişiklik yaparken
+
+- İstenen işin dosyalarını ve ilgili commit farklarını incele. Aynı ekran veya akış başka bir commit'te değiştiyse iki tarafın davranışını karşılaştır; çalışan özelliği sessizce eski haline döndürme. Çakışmayı yalnızca dosya metni düzeyinde değil, kullanıcı akışı düzeyinde çöz.
 - Masa ekranında ürün seçimi ayrı sayfaya geçmez. Panel masa görünümü üzerinde açılır, tablet ve dokunmatik hedefleri korunur. Toplu sipariş onaylandıktan sonra panel açık kalır; personel aynı masaya başka ürünler ekleyebilir. Yönetici zayi ayarı ve sunucudaki rol denetimi korunur.
 - Bu depo web uygulamasıdır. Masaüstü uygulamasını değiştirme. Canlı sağlayıcı bağlantısı ve veritabanı erişimi yoksa demo akışını canlıymış gibi gösterme.
-- Web kodu değişirse arayüz testlerini, TypeScript denetimini ve üretim derlemesini çalıştır. API kodu değişirse API testlerini çalıştır. Derlenmiş `wwwroot` dosyalarını kaynakla birlikte güncelle.
-- Açık 5080 sunucusu yeni .NET kodunu kendiliğinden yüklemez. Çalışan uygulama ile diskteki sürümü ayırt et; doğrulama yaparken gerekirse sunucuyu yeniden başlat ve tarayıcıyı yenile.
-- Göndermeden hemen önce `origin/main` dalını tekrar getir. Yalnız bu işin dosyalarını commit'e al; başkasının açık dosyalarını dahil etme. Yalnız `main` dalına normal hızlı ileri gönderim yap; `force push` kullanma.
+- Kullanıcının açık dosyalarına `git reset --hard`, `git checkout -- .` veya benzeri toplu geri alma komutları uygulama. Birleştirme güvenle tamamlanamıyorsa çakışan dosyaları ve korunması gereken davranışları kullanıcıya bildir; üzerine yazıp gönderme.
+
+## Doğrulama ve gönderme
+
+1. Web kodu değişirse arayüz testlerini, TypeScript denetimini ve üretim derlemesini çalıştır. API kodu değişirse API testlerini çalıştır. Derlenmiş `wwwroot` dosyalarını kaynakla birlikte güncelle. Açık 5080 sunucusu yeni .NET kodunu kendiliğinden yüklemez; gerekirse sunucuyu yeniden başlat ve tarayıcıyı yenile.
+2. Yalnız bu işe ait dosyaları açıkça seçerek `git add -- <dosyalar>` yap. `git diff --cached` ve `git status` ile commit içeriğini kontrol et. Başkasının açık dosyalarını veya eski kopyanın toplu değişikliklerini commit'e alma.
+3. Push'tan hemen önce tekrar `git fetch origin main` çalıştır. Uzak dal ilerlediyse yeni commit'leri dahil et, etkilenen akışları yeniden doğrula. Yalnız `main` dalına normal hızlı ileri push yap; `force push` kullanma. Push reddedilirse uzak değişiklikleri getirip birleştir ve tekrar test et; eski commit'i zorla gönderme.

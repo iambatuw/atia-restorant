@@ -5,6 +5,8 @@
 
 # ATIA Restoran Web
 
+Birden fazla bilgisayarda veya kod ajanıyla çalışırken önce [depo çalışma kurallarını](AGENTS.md) okuyun. Değişikliğe başlamadan ve GitHub'a göndermeden hemen önce uzak `main` dalını kontrol edin; yeni commit'leri kendi işinizle birleştirin. Claude Code ve GitHub Copilot için aynı kurallara yönlendiren talimat dosyaları da depodadır.
+
 ATIA'nın masaüstü restoran uygulamasını web ortamına taşıyoruz. Bu depoda personel ekranları, API ve tarayıcıda açılan müşteri menüsü birlikte duruyor. Şu anki sürüm, restoran akışlarını **demo verisiyle** denemek için çalışıyor; gerçek mağaza veritabanına bağlı değil.
 
 Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük rapor, menü yönetimi, gelen sipariş kutusu ve rezervasyon var. Giriş ekranı korunarak diğer personel ekranları yeniden düzenlendi. Masaüstünden hangi özelliklerin taşınmaya değer olduğunu ve hangi bağlantıların beklediğini [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) anlattık.
