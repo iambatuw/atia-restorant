@@ -5,10 +5,27 @@ Bu kurallar depoda çalışan bütün kod ajanları (Claude Code, GitHub Copilot
 ## Altın kurallar
 
 1. Hiçbir işe `git fetch origin main` yapmadan başlama, hiçbir push'u da bu kontrolü tekrarlamadan yapma.
+   **Uzakta alınmamış commit varsa durmak zorunludur:** önce o commit'leri incele ve yerel dala al. `git log --oneline HEAD..origin/main` boş çıkmadan dosya düzenlemeye, commit'e veya push'a geçme. "Sonra alırım" diye atlamak yasaktır.
 2. Uzakta görmediğin bir değişiklik varsa o değişiklik **diğer kişinin bilinçli işidir**. Onu hata, eski kod veya kendi yarım işin sanıp geri alma, silme ya da üzerine yazma.
 3. Bir dosya hatırladığından veya beklediğinden farklıysa önce `git log -p -- <dosya>` ile kimin, neden değiştirdiğine bak. Gerekçesini anlamadan geri çevirme.
 4. Yalnızca git ile çalış. Klasör kopyalama, eski yedekten dosya yapıştırma veya bulut eşitlemesiyle dosya taşıma yapma.
 5. `git push --force`, `git reset --hard`, `git checkout -- .`, `git clean` ve benzeri toplu geri alma komutlarını kullanma.
+
+## Uzaktaki commit'leri inceleme (zorunlu)
+
+Diğer kişinin her push'u, senin bir sonraki işinden önce alınmalı ve anlaşılmalıdır:
+
+1. `git fetch origin main` ve `git log --oneline HEAD..origin/main` ile alınmamış commit'leri listele.
+2. Her commit için `git show --stat <commit>` ile mesajı ve değişen dosyaları oku. Kendi işinle aynı dosyalara dokunanlarda `git show <commit> -- <dosya>` ile farkı incele.
+3. Commit'leri al (`git merge origin/main`). Sonra `git log --oneline HEAD..origin/main` tekrar çalıştır; çıktı boş olmalı.
+4. Kullanıcıya kısaca hangi commit'lerin geldiğini ve neyi değiştirdiğini söyle. Bu adım tamamlanmadan istenen işe başlama.
+5. Gelen değişiklik **Korunan davranışlar** listesine yeni bir madde eklediyse veya bir davranışı değiştirdiyse o haliyle kabul et.
+
+## Commit mesajı dili
+
+- Commit mesajları **Türkçe** ve **Türkçe karakterlerle** (ç, ğ, ı, İ, ö, ş, ü) yazılır. "degisiklik", "odeme", "sifirla" gibi harfleri düzleştirilmiş yazım kullanılmaz; "değişiklik", "ödeme", "sıfırla" yazılır.
+- İlk satır ne yapıldığını söyleyen kısa bir cümledir (ör. "Paket servise kurye seçimini ekle"). Gerekirse boş satırdan sonra maddeler hâlinde ayrıntı ve nedeni yazılır.
+- Mesajı dosyadan veya standart girdiden UTF-8 olarak ver (`git commit -F -`); terminal kod sayfası yüzünden bozulan karakterle commit atma. Bozuk görünen bir mesajı push etmeden önce `git commit --amend` ile düzelt.
 
 ## Yalnız GitHub güncellemesini getirme isteği
 
@@ -51,8 +68,8 @@ Aşağıdakiler bilinçli kararlardır ve çalışır durumdadır. Kullanıcı a
 1. Web kodu değişirse `ClientApp` içinde `npm test` ve `npm run build` çalıştır (TypeScript denetimi derlemeye dahildir). API kodu değişirse `dotnet test Tests/AtiaRestorant.API.Tests.csproj` çalıştır. Test kırılırsa testi silerek veya gevşeterek geçirme; nedenini bul.
 2. Derlenmiş `wwwroot` dosyalarını kaynakla birlikte güncelle. `wwwroot/assets` dosya adları her derlemede değişir: bu klasörde çakışma olursa elle seçim yapma, kaynağı birleştirdikten sonra `npm run build` ile yeniden üret ve eski asset dosyalarını silinmiş olarak commit'e al.
 3. Yalnız bu işe ait dosyaları açıkça seçerek `git add -- <dosyalar>` yap. `git diff --cached --stat` ve `git status` ile kontrol et. `App_Data/`, `bin/`, `obj/`, `node_modules/`, `.claude/` ve kullanıcının işle ilgisiz açık dosyaları commit'e girmez.
-4. Commit mesajında ne değiştiğini ve neden değiştiğini Türkçe ve açık yaz; diğer kişinin ajanı ne yaptığını bu mesajdan anlar.
-5. Push'tan hemen önce tekrar `git fetch origin main` çalıştır. Uzak dal ilerlediyse yeni commit'leri birleştir, etkilenen testleri ve derlemeyi yeniden çalıştır.
+4. Commit mesajında ne değiştiğini ve neden değiştiğini Türkçe karakterlerle, açık yaz (bkz. "Commit mesajı dili"); diğer kişinin ajanı ne yaptığını bu mesajdan anlar.
+5. Push'tan hemen önce tekrar `git fetch origin main` çalıştır. Uzak dal ilerlediyse push etme: önce "Uzaktaki commit'leri inceleme" adımlarını uygula, yeni commit'leri birleştir, etkilenen testleri ve derlemeyi yeniden çalıştır. `git merge-base --is-ancestor origin/main HEAD` başarılı olmadan push yapılmaz.
 6. Yalnız `main` dalına normal hızlı ileri push yap (`git push origin HEAD:main`). Push reddedilirse uzak değişiklikleri getirip birleştir ve tekrar test et; asla zorla gönderme.
 7. Açık 5080 sunucusu yeni .NET kodunu kendiliğinden yüklemez; gerekirse sunucuyu yeniden başlat ve tarayıcıyı yenile.
 
