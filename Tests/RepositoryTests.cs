@@ -85,10 +85,41 @@ public sealed class RepositoryTests
         repository.FinishKitchenPrint(eventItem.KayitNo, new() { Basarili = true }, Cook);
         repository.AcknowledgeKitchenEvent(eventItem.KayitNo, Cook);
         Assert.DoesNotContain(repository.KitchenEvents(Cook), e => e.KayitNo == eventItem.KayitNo);
+        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.RemoveOrder(line.KayitNo,
+            new() { Tip = SiparisCikarmaTipi.Zayi, Gerekce = "Döküldü" }, Admin)).Status);
+        repository.SetWasteEnabled(new() { ZayiAktif = true }, Admin);
         repository.RemoveOrder(line.KayitNo, new() { Tip = SiparisCikarmaTipi.Zayi,
             Gerekce = "Döküldü" }, Admin);
         Assert.Contains(repository.KitchenEvents(Cook), e => e.Islem == "Zayi" && e.AdisyonNo == receipt.KayitNo);
         Assert.Equal(320m, repository.DailyReport(repository.BusinessToday, Admin).Mutabakat.ZayiTutari);
+    }
+
+    [Fact]
+    public void BatchOrderValidatesEveryLineBeforeOpeningAReceipt()
+    {
+        var repository = Repository();
+        var invalid = new TopluSiparisEkleRequest { MasaKayitNo = 12,
+            Satirlar = [Order(), new SiparisEkleRequest { MasaKayitNo = 12, StokKayitNo = 999, Miktar = 1 }] };
+        Assert.Equal(404, Assert.Throws<ApiException>(() => repository.AddOrders(invalid, Waiter)).Status);
+        Assert.Null(repository.Receipt(12));
+        Assert.DoesNotContain(repository.Audit(repository.BusinessToday, Admin), e => e.Islem == "Ürün eklendi" && e.Aciklama.Contains("Masa 12"));
+
+        var valid = new TopluSiparisEkleRequest { MasaKayitNo = 12,
+            Satirlar = [Order(), new SiparisEkleRequest { MasaKayitNo = 12, StokKayitNo = 1, Miktar = 1, SatirAciklama = "Az tuzlu" }] };
+        var receipt = repository.AddOrders(valid, Waiter);
+        Assert.Equal(2, receipt.Detaylar.Count);
+        Assert.Equal(415m, receipt.GenelToplam);
+        Assert.Contains(receipt.Detaylar, line => line.SatirAciklama == "Az tuzlu");
+    }
+
+    [Fact]
+    public void WasteSettingIsAdminOnlyAndDefaultsToOff()
+    {
+        var repository = Repository();
+        Assert.False(repository.Settings().ZayiAktif);
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.SetWasteEnabled(new() { ZayiAktif = true }, Waiter)).Status);
+        Assert.True(repository.SetWasteEnabled(new() { ZayiAktif = true }, Admin).ZayiAktif);
+        Assert.False(repository.SetWasteEnabled(new() { ZayiAktif = false }, Admin).ZayiAktif);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 export type Role = 'Admin' | 'Garson' | 'Mutfak';
 export interface Session { Token:string; KullaniciAdi:string; Rol:Role; KullaniciId:number; TamAd:string }
 export interface Health {Mode:string;DatabaseReady:boolean}
+export interface RestaurantSettings {ZayiAktif:boolean}
 export interface Table {MasaId:number;MasaAdi:string;MasaKodu:string;RestorantBolumuKayitNo:number;RestorantBolumAdi:string;BaslikKayitNo:number|null;Tutar:number|null;KisiSayisi:number;AcilisTarihi:string|null;Rezerve:boolean;BirlesmisMasa:boolean;AnaMasa:boolean;Durumu:number}
 export interface Section {KayitNo:number;BolumAdi:string;ToplamMasa:number;DoluMasa:number}
 export interface Portion {KayitNo:number;PorsiyonAdi:string;Fiyat:number}

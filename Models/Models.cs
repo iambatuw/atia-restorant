@@ -96,6 +96,22 @@ public class SiparisEkleRequest
     public string? StokEkstraAdi { get; set; }
 }
 
+public class TopluSiparisEkleRequest
+{
+    public long MasaKayitNo { get; set; }
+    public List<SiparisEkleRequest> Satirlar { get; set; } = [];
+}
+
+public class RestoranAyarlariDTO
+{
+    public bool ZayiAktif { get; set; }
+}
+
+public class ZayiAyariRequest
+{
+    public bool ZayiAktif { get; set; }
+}
+
 public class SiparisGuncelleRequest
 {
     public long DetayKayitNo { get; set; }

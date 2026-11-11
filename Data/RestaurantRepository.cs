@@ -39,6 +39,7 @@ public sealed class RestaurantRepository
     private readonly List<GelenSiparisDTO> _incomingOrders = [];
     private readonly Dictionary<DateOnly, VardiyaKapanisDTO> _shiftClosings = [];
     private readonly HashSet<long> _mergedReceipts = [];
+    private bool _wasteEnabled;
     private long _nextAudit, _nextKitchenEvent, _nextIncomingOrder, _nextProduct = 11, _nextCategory = 4;
     private int _nextPortion = 1000;
     private readonly int _businessDayStartHour;
@@ -358,7 +359,17 @@ public sealed class RestaurantRepository
     });
     public AdisyonBaslikDTO? Receipt(long tableId) => Read(() => { Table(tableId); return Open(tableId); });
 
-    public AdisyonBaslikDTO AddOrder(SiparisEkleRequest request, StaffActor actor) => Change(() =>
+    public RestoranAyarlariDTO Settings() => Read(() => new RestoranAyarlariDTO { ZayiAktif = _wasteEnabled });
+    public RestoranAyarlariDTO SetWasteEnabled(ZayiAyariRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        _wasteEnabled = request.ZayiAktif;
+        Log(actor, "Zayi ayarı değiştirildi", _wasteEnabled ? "Zayi açıldı" : "Zayi kapatıldı");
+        return new RestoranAyarlariDTO { ZayiAktif = _wasteEnabled };
+    });
+
+    private (RestorantMasaDTO Table, MenuUrunDTO Product, PorsiyonDTO? Portion) PrepareOrder(
+        SiparisEkleRequest request, StaffActor actor)
     {
         Permission(actor, StaffOperation.Order);
         Quantity(request.Miktar); Note(request.SatirAciklama);
@@ -371,6 +382,24 @@ public sealed class RestaurantRepository
         var portion = request.PorsiyonKayitNo.HasValue
             ? product.Porsiyonlar.FirstOrDefault(p => p.KayitNo == request.PorsiyonKayitNo) : null;
         Require(!request.PorsiyonKayitNo.HasValue || portion is not null, "Ürüne ait porsiyon bulunamadı.");
+        return (table, product, portion);
+    }
+
+    public AdisyonBaslikDTO AddOrders(TopluSiparisEkleRequest request, StaffActor actor) => Change(() =>
+    {
+        Require(request.Satirlar is { Count: > 0 and <= 50 }, "Onaylanacak ürün sayısı 1–50 olmalı.");
+        Require(request.MasaKayitNo > 0 && request.Satirlar.All(line => line is not null && line.MasaKayitNo == request.MasaKayitNo),
+            "Tüm ürünler aynı masaya ait olmalı.");
+        foreach (var line in request.Satirlar) PrepareOrder(line, actor);
+        AdisyonBaslikDTO? receipt = null;
+        foreach (var line in request.Satirlar) receipt = AddOrderCore(line, actor);
+        return receipt!;
+    });
+
+    public AdisyonBaslikDTO AddOrder(SiparisEkleRequest request, StaffActor actor) => Change(() => AddOrderCore(request, actor));
+    private AdisyonBaslikDTO AddOrderCore(SiparisEkleRequest request, StaffActor actor)
+    {
+        var (table, product, portion) = PrepareOrder(request, actor);
         var receipt = Open(table.MasaId);
         if (receipt is null)
         {
@@ -390,7 +419,7 @@ public sealed class RestaurantRepository
         Log(actor, "Ürün eklendi", $"{receipt.MasaAdi}: {line.Miktar} × {line.StokAdi}", receipt.KayitNo, line.SatirTutari);
         KitchenEvent(receipt, line, "Eklendi", line.Miktar);
         return receipt;
-    });
+    }
 
     public AdisyonBaslikDTO UpdateOrder(long id, SiparisGuncelleRequest request, StaffActor actor) => Change(() =>
     {
@@ -428,6 +457,8 @@ public sealed class RestaurantRepository
     {
         Require(Enum.IsDefined(request.Tip), "İşlem türü geçersiz.");
         Permission(actor, request.Tip == SiparisCikarmaTipi.Zayi ? StaffOperation.Waste : StaffOperation.Cancel);
+        if (request.Tip == SiparisCikarmaTipi.Zayi)
+            Require(_wasteEnabled, "Zayi işlemi ayarlardan etkinleştirilmeli.", 409);
         Require(!string.IsNullOrWhiteSpace(request.Gerekce) && request.Gerekce.Trim().Length is <= 200,
             "Gerekçe 1–200 karakter olmalı.");
         var (receipt, line) = Line(id);

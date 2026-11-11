@@ -213,6 +213,40 @@ public sealed class HttpContractTests
     }
 
     [Fact]
+    public async Task BatchConfirmationAndWasteSettingEnforceServerRules()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+        await Login(client, "garson");
+        var initial = await client.GetFromJsonAsync<ApiResult<RestoranAyarlariDTO>>("/api/ayarlar", Json);
+        Assert.False(initial!.Data!.ZayiAktif);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/ayarlar/zayi",
+            new ZayiAyariRequest { ZayiAktif = true })).StatusCode);
+
+        var invalid = new TopluSiparisEkleRequest { MasaKayitNo = 12,
+            Satirlar = [new() { MasaKayitNo = 12, StokKayitNo = 1, Miktar = 1 },
+                new() { MasaKayitNo = 12, StokKayitNo = 999, Miktar = 1 }] };
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/siparisler/toplu", invalid)).StatusCode);
+        Assert.Null((await client.GetFromJsonAsync<ApiResult<AdisyonBaslikDTO?>>("/api/masalar/12/adisyon", Json))!.Data);
+
+        invalid.Satirlar[1].StokKayitNo = 4;
+        var created = await client.PostAsJsonAsync("/api/siparisler/toplu", invalid);
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var receipt = (await created.Content.ReadFromJsonAsync<ApiResult<AdisyonBaslikDTO>>(Json))!.Data!;
+        Assert.Equal(2, receipt.Detaylar.Count);
+        Assert.Equal(415m, receipt.GenelToplam);
+
+        await Login(client, "admin");
+        var lineId = receipt.Detaylar[0].KayitNo;
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync($"/api/siparisler/{lineId}/cikar",
+            new SiparisCikarmaRequest { Tip = SiparisCikarmaTipi.Zayi, Gerekce = "Döküldü" })).StatusCode);
+        var enabled = await client.PutAsJsonAsync("/api/ayarlar/zayi", new ZayiAyariRequest { ZayiAktif = true });
+        Assert.True((await enabled.Content.ReadFromJsonAsync<ApiResult<RestoranAyarlariDTO>>(Json))!.Data!.ZayiAktif);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/siparisler/{lineId}/cikar",
+            new SiparisCikarmaRequest { Tip = SiparisCikarmaTipi.Zayi, Gerekce = "Döküldü" })).StatusCode);
+    }
+
+    [Fact]
     public async Task HttpCancellationRequiresReasonAndWasteNeedsAdmin()
     {
         using var factory = new ApiFactory();

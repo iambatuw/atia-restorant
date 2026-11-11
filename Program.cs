@@ -168,8 +168,16 @@ api.MapGet("/masalar", (long? bolumId, RestaurantRepository repository) =>
     Results.Ok(ApiResult<List<RestorantMasaDTO>>.Ok(repository.Tables(bolumId))));
 api.MapGet("/masalar/{id:long}/adisyon", (long id, RestaurantRepository repository) =>
     Results.Ok(ApiResult<AdisyonBaslikDTO?>.Ok(repository.Receipt(id))));
+api.MapGet("/ayarlar", (RestaurantRepository repository) =>
+    Results.Ok(ApiResult<RestoranAyarlariDTO>.Ok(repository.Settings())));
+api.MapPut("/ayarlar/zayi", (ZayiAyariRequest request, ClaimsPrincipal user, RestaurantRepository repository,
+    IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+    Mutate(() => repository.SetWasteEnabled(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
 api.MapPost("/siparisler", (SiparisEkleRequest request, ClaimsPrincipal user, RestaurantRepository repository,
     IHubContext<RestorantHub> hub, ILoggerFactory logs) => Mutate(() => repository.AddOrder(request, Actor(user)), hub, logs))
+    .RequireAuthorization("Orders");
+api.MapPost("/siparisler/toplu", (TopluSiparisEkleRequest request, ClaimsPrincipal user, RestaurantRepository repository,
+    IHubContext<RestorantHub> hub, ILoggerFactory logs) => Mutate(() => repository.AddOrders(request, Actor(user)), hub, logs))
     .RequireAuthorization("Orders");
 api.MapPatch("/siparisler/{id:long}", (long id, SiparisGuncelleRequest request, ClaimsPrincipal user,
     RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>

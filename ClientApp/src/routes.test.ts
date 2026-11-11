@@ -19,6 +19,9 @@ describe('staff routes',()=>{
     expect(canAccess('entegrasyonlar','Garson')).toBe(false);
     expect(canAccess('paket-servis','Garson')).toBe(true);
     expect(canAccess('paket-servis','Mutfak')).toBe(false);
+    expect(pageFromPath('/app/ayarlar')).toBe('ayarlar');
+    expect(canAccess('ayarlar','Admin')).toBe(true);
+    expect(canAccess('ayarlar','Garson')).toBe(false);
     expect(pageFromPath('/app/rezervasyonlar')).toBe('rezervasyonlar');
   });
   it('keeps older product-picker links valid while opening the picker over a table',()=>{

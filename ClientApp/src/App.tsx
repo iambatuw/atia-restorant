@@ -14,7 +14,8 @@ import {
   LogOut,
   RefreshCw,
   ArrowUpRight,
-  Clock
+  Clock,
+  Settings2
 } from 'lucide-react';
 import type {Health,Session} from './types';
 import {api,ApiError,setToken} from './api';
@@ -27,6 +28,7 @@ import {Kitchen} from './Kitchen';
 import {Overview} from './Overview';
 import {Integrations} from './Integrations';
 import {DeliveryPage} from './DeliveryPage';
+import {SettingsPage} from './SettingsPage';
 import './Operations.css';
 import {canAccess,defaultPage,pageFromPath,pagePath} from './routes';
 import type {Page} from './routes';
@@ -159,7 +161,8 @@ export default function App(){
     {id:'menu',label:'Menü',icon:BookOpen,allowed:true},
     {id:'raporlar',label:'Günlük rapor',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
     {id:'entegrasyonlar',label:'Entegrasyonlar',icon:PlugZap,allowed:session.Rol==='Admin'},
-    {id:'rezervasyonlar',label:'Rezervasyonlar',icon:CalendarDays,allowed:session.Rol==='Admin'}
+    {id:'rezervasyonlar',label:'Rezervasyonlar',icon:CalendarDays,allowed:session.Rol==='Admin'},
+    {id:'ayarlar',label:'Ayarlar',icon:Settings2,allowed:session.Rol==='Admin'}
   ];
   const page:Page=requested&&canAccess(requested,session.Rol)?requested:defaultPage(session.Rol);
   const current=nav.find(n=>n.id===page)!;
@@ -236,6 +239,8 @@ export default function App(){
               <MenuPage admin={session.Rol==='Admin'}/>
             ):page==='entegrasyonlar'?(
               <Integrations navigate={p=>navigate(pagePath(p))}/>
+            ):page==='ayarlar'?(
+              <SettingsPage/>
             ):(
               <Management page={page as 'raporlar'|'rezervasyonlar'}/>
             )}
