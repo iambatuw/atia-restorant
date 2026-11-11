@@ -24,7 +24,7 @@ describe('staff routes',()=>{
     expect(canAccess('ayarlar','Garson')).toBe(false);
     expect(pageFromPath('/app/rezervasyonlar')).toBe('rezervasyonlar');
   });
-  it('keeps older product-picker links valid while opening the picker over a table',()=>{
+  it('opens the product picker at its own direct page address',()=>{
     expect(tablePath(12)).toBe('/app/masalar/12');
     expect(tablePath(12,true)).toBe('/app/masalar/12/urun-ekle');
     expect(tableRouteFromPath('/app/masalar/12/urun-ekle/')).toEqual({tableId:12,picker:true});
