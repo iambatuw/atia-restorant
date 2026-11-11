@@ -16,9 +16,11 @@ import {
   Banknote,
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Printer,
+  ScanLine
 } from 'lucide-react';
-import type {Category,OrderLine,Product,Receipt,RestaurantSettings,Section,Session,Table,PosCihazTipi,PosIslemKayit} from './types';
+import type {Category,FullSettings,MealCard,OrderLine,Product,Receipt,ReceiptLocation,Section,Session,Table,PosCihazTipi,PosIslemKayit} from './types';
 import {
   api,
   money,
@@ -33,6 +35,10 @@ import {
 } from './api';
 import {Empty,ErrorBox,Loading,Modal} from './ui';
 import {tablePath,tableRouteFromPath} from './routes';
+import {BillPrint} from './Barcode';
+import {OptionChooser} from './Options';
+import {SplitPaymentPanel} from './PaymentSplit';
+import './Extensions.css';
 
 export function Tables({session,path,navigate}:{session:Session;path:string;navigate:(path:string)=>void}){
   const tables=useQuery({queryKey:['tables'],queryFn:()=>api<Table[]>('/masalar'),refetchInterval:15000});
@@ -69,7 +75,7 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
             </div>
             <div className="op-floor-filters"><div className="op-filter-set" role="group" aria-label="Masa durumu">
               {[['all','Tümü'],['busy','Dolu'],['free','Boş'],['reserved','Rezerve']].map(([id,label])=><button key={id} aria-pressed={status===id} onClick={()=>setStatus(id)}>{label}</button>)}
-            </div><label className="op-search"><Search size={17}/><input type="search" placeholder="Masa ara" aria-label="Masa ara" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>
+            </div><label className="op-search"><Search size={17}/><input type="search" placeholder="Masa ara" aria-label="Masa ara" value={search} onChange={e=>setSearch(e.target.value)}/></label><ReceiptLookup navigate={navigate}/></div>
           </div>
           <ErrorBox error={tables.error||sections.error} retry={()=>{void tables.refetch();void sections.refetch();}}/>
           {tables.isPending?<Loading/>:visible.length===0?<Empty>Bu filtreye uygun masa yok.</Empty>:(
@@ -105,6 +111,27 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
   );
 }
 
+/** Opens a receipt by number: typed by hand or read from the barcode on a printed bill. */
+function ReceiptLookup({navigate}:{navigate:(path:string)=>void}){
+  const [value,setValue]=useState('');
+  const [message,setMessage]=useState('');
+  const lookup=useMutation({
+    mutationFn:(id:number)=>api<ReceiptLocation>(`/adisyonlar/${id}/konum`),
+    onSuccess:found=>{
+      setValue('');
+      if(!found.Kapali&&found.MasaKayitNo){setMessage('');navigate(tablePath(found.MasaKayitNo));}
+      else setMessage(`Adisyon #${found.KayitNo} kapalı (${found.MasaAdi??'masa yok'}). Geçmişi Adisyonlar ekranında görebilirsiniz.`);
+    },
+    onError:error=>setMessage(error instanceof Error?error.message:'Adisyon bulunamadı.')
+  });
+  const submit=()=>{const digits=value.replace(/\D/g,'');if(digits)lookup.mutate(Number(digits));};
+  return <div className="op-lookup">
+    <label className="op-search"><ScanLine size={17}/><input inputMode="numeric" placeholder="Adisyon no / barkod" aria-label="Adisyon numarası veya barkod" value={value}
+      onChange={e=>{setValue(e.target.value);setMessage('');}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();submit();}}}/></label>
+    {message&&<span className="op-note" role="status">{message}</span>}
+  </div>;
+}
+
 function minutes(date:string|null){
   return date?Math.max(0,Math.floor((Date.now()-new Date(date).getTime())/60000)):0;
 }
@@ -118,8 +145,9 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
   const [cancel,setCancel]=useState<OrderLine|null>(null);
   const [removalReason,setRemovalReason]=useState('');
   const [removalType,setRemovalType]=useState<0|1>(0);
-  const settings=useQuery({queryKey:['settings'],queryFn:()=>api<RestaurantSettings>('/ayarlar')});
+  const settings=useQuery({queryKey:['settings'],queryFn:()=>api<FullSettings>('/ayarlar')});
   const wasteEnabled=admin&&settings.data?.ZayiAktif===true;
+  const [printing,setPrinting]=useState(false);
   const effectiveRemovalType=wasteEnabled?removalType:0;
 
   const receipt=useQuery({
@@ -145,6 +173,10 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
 
   const busy=mutation.isPending||transferMutation.isPending;
   const order=receipt.data;
+  const printMark=useMutation({
+    mutationFn:(id:number)=>api<Receipt>(`/adisyonlar/${id}/yazdirildi`,{method:'POST'}),
+    onSuccess:()=>{setPrinting(true);void client.invalidateQueries({queryKey:['tables']});}
+  });
 
   const change=(line:OrderLine,delta:number)=>{
     if(line.Miktar+delta<=0){
@@ -186,9 +218,10 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
               <div className="order-item-row" key={line.KayitNo}>
                 <div className="item-row-top">
                   <div className="item-qty-badge">{line.Miktar}×</div>
-                  <strong className="item-name">{line.StokAdi}{line.PorsiyonAdi?` · ${line.PorsiyonAdi}`:''}</strong>
+                  <strong className="item-name">{line.StokAdi}{line.PorsiyonAdi?` · ${line.PorsiyonAdi}`:''}{line.SecimMetni&&<span className="op-line-choice">{line.SecimMetni}</span>}</strong>
                   <strong className="item-sum">{money(line.SatirTutari)}</strong>
                 </div>
+                {(line.OdenenMiktar??0)>0&&<span className="op-paid-tag">{line.OdenenMiktar} adet ödendi</span>}
 
                 {line.SatirAciklama&&(
                   <div className="item-note-tag">
@@ -202,7 +235,7 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
                   <div className="item-stepper">
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={busy||line.Miktar-1<(line.OdenenMiktar??0)}
                       aria-label={`${line.StokAdi}${line.PorsiyonAdi?` ${line.PorsiyonAdi}`:''} adet azalt`}
                       onClick={()=>change(line,-1)}
                     >
@@ -220,7 +253,7 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
                   </div>
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy||(line.OdenenMiktar??0)>0}
                     className="item-delete-btn"
                     aria-label={`${line.StokAdi}${line.PorsiyonAdi?` ${line.PorsiyonAdi}`:''} için ${wasteEnabled?'iptal veya zayi kaydet':'iptal et'}`}
                     onClick={()=>setCancel(line)}
@@ -253,6 +286,24 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
             </div>
           </div>
         )}
+
+        {order&&(
+          <div className="op-guest-control">
+            <span>Kişi sayısı</span>
+            <span className="op-stepper">
+              <button type="button" aria-label="Kişi sayısını azalt" disabled={busy||order.KisiSayisi<=1}
+                onClick={()=>mutation.mutate({path:`/masalar/${table.MasaId}/kisi-sayisi`,method:'PATCH',body:{KisiSayisi:order.KisiSayisi-1}})}><Minus size={15}/></button>
+              <strong>{order.KisiSayisi}</strong>
+              <button type="button" aria-label="Kişi sayısını artır" disabled={busy||order.KisiSayisi>=50}
+                onClick={()=>mutation.mutate({path:`/masalar/${table.MasaId}/kisi-sayisi`,method:'PATCH',body:{KisiSayisi:order.KisiSayisi+1}})}><Plus size={15}/></button>
+            </span>
+            <button type="button" className="secondary" disabled={busy||printMark.isPending||order.Detaylar.length===0}
+              onClick={()=>printMark.mutate(order.KayitNo)} title="Müşteriye bilgi fişi yazdır">
+              <Printer size={15}/> <span>Adisyonu yazdır</span>
+            </button>
+          </div>
+        )}
+        <ErrorBox error={printMark.error}/>
 
         {admin?(
           <div className="pos-actions-block">
@@ -318,8 +369,9 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
       )}
 
       {payment&&order&&(
-        <PaymentModal receipt={order} table={table} onClose={()=>setPayment(false)}/>
+        <PaymentModal receipt={order} table={table} mealCards={settings.data?.YemekKartlari??[]} onClose={()=>setPayment(false)}/>
       )}
+      {printing&&order&&<BillPrint receipt={order} store={settings.data?.Isletme} onDone={()=>setPrinting(false)}/>}
 
       {transfer&&(
         <Modal title={`${table.MasaAdi} · Masayı taşı`} onClose={()=>{if(!busy)setTransfer(false);}}>
@@ -348,11 +400,21 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
   );
 }
 
-type DraftProduct={id:number;product:Product;portionId?:number;portionName?:string;amount:number;note:string};
+type DraftProduct={id:number;product:Product;portionId?:number;portionName?:string;amount:number;note:string;options:number[];optionText:string};
+
+/** Adds or removes a quick note (comma separated) without touching the rest of the typed note. */
+export function toggleQuickNote(note:string,quick:string):string{
+  const parts=note.split(',').map(part=>part.trim()).filter(Boolean);
+  const has=parts.some(part=>part.toLocaleLowerCase('tr')===quick.toLocaleLowerCase('tr'));
+  return (has?parts.filter(part=>part.toLocaleLowerCase('tr')!==quick.toLocaleLowerCase('tr')):[...parts,quick]).join(', ');
+}
 
 function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
   const client=useQueryClient();
   const menu=useQuery({queryKey:['menu','public'],queryFn:()=>api<Category[]>('/menu')});
+  const settings=useQuery({queryKey:['settings'],queryFn:()=>api<FullSettings>('/ayarlar')});
+  const quickNotes=settings.data?.HazirNotlar??[];
+  const [optionTarget,setOptionTarget]=useState<{product:Product;portionId?:number}|null>(null);
   const [category,setCategory]=useState<number|null>(null);
   const [search,setSearch]=useState('');
   const [quantity,setQuantity]=useState(1);
@@ -367,7 +429,7 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
     mutationFn:(lines:DraftProduct[])=>api<Receipt>('/siparisler/toplu',{
       method:'POST',body:JSON.stringify({MasaKayitNo:table.MasaId,Satirlar:lines.map(line=>({
         MasaKayitNo:table.MasaId,StokKayitNo:line.product.KayitNo,PorsiyonKayitNo:line.portionId,
-        Miktar:line.amount,SatirAciklama:line.note
+        Miktar:line.amount,SatirAciklama:line.note,SecenekKayitNolar:line.options
       }))})
     }),
     onSuccess:async(_,lines)=>{
@@ -387,17 +449,26 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
   const products=categories.filter(item=>category===null||item.KayitNo===category)
     .flatMap(item=>item.Urunler)
     .filter(product=>product.StokAdi.toLocaleLowerCase('tr').includes(query));
-  const select=(product:Product,portionId?:number)=>{
+  const select=(product:Product,portionId?:number,options?:number[])=>{
     if(confirm.isPending||draft.length>=50)return;
     confirm.reset();
     setConfirmDiscard(false);
     setLastAdded('');
-    if(product.Porsiyonlar.length>0&&portionId===undefined){setPortionProduct(product);return;}
+    if(product.Porsiyonlar.length>0&&portionId===undefined){setPortionProduct(product);setOptionTarget(null);return;}
+    if((product.SecenekGruplari?.length??0)>0&&options===undefined){setPortionProduct(null);setOptionTarget({product,portionId});return;}
     const portion=product.Porsiyonlar.find(item=>item.KayitNo===portionId);
-    setDraft(lines=>[...lines,{id:++nextDraftId.current,product,portionId,portionName:portion?.PorsiyonAdi,amount:quantity,note:note.trim()}]);
+    const chosen=(product.SecenekGruplari??[]).flatMap(group=>group.Secenekler).filter(option=>options?.includes(option.KayitNo));
+    setDraft(lines=>[...lines,{id:++nextDraftId.current,product,portionId,portionName:portion?.PorsiyonAdi,amount:quantity,note:note.trim(),
+      options:chosen.map(option=>option.KayitNo),optionText:chosen.map(option=>option.Ad).join(', ')}]);
     setPortionProduct(null);
+    setOptionTarget(null);
     setNote('');
     setQuantity(1);
+  };
+  const scanBarcode=()=>{
+    const code=search.trim();
+    const match=code?categories.flatMap(item=>item.Urunler).find(product=>product.Barkod&&product.Barkod.toLocaleLowerCase('tr')===code.toLocaleLowerCase('tr')):undefined;
+    if(match){setSearch('');select(match);}
   };
   const draftAmount=draft.reduce((total,line)=>total+line.amount,0);
   const closePicker=()=>{
@@ -408,13 +479,16 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
   return <Modal title={`${table.MasaAdi} · Ürün ekle`} className="table-product-dialog" onClose={closePicker} preventClose={confirm.isPending}>
     <div className="table-product-meta"><span>{table.RestorantBolumAdi} masası</span><span>Ürünleri seçin, sonra onaylayın</span></div>
     <div className="table-product-tools">
-      <label className="table-product-search"><Search size={20}/><input type="search" placeholder="Ürün ara" aria-label="Ürün ara" value={search} onChange={event=>{setSearch(event.target.value);setPortionProduct(null);}}/></label>
+      <label className="table-product-search"><Search size={20}/><input type="search" placeholder="Ürün ara veya barkod okutun" aria-label="Ürün ara veya barkod okutun" value={search} onChange={event=>{setSearch(event.target.value);setPortionProduct(null);}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();scanBarcode();}}}/></label>
       <div className="table-product-categories" role="group" aria-label="Ürün kategorileri">
         <button type="button" aria-pressed={category===null} onClick={()=>{setCategory(null);setPortionProduct(null);}}>Tümü</button>
         {categories.map(item=><button type="button" key={item.KayitNo} aria-pressed={category===item.KayitNo} onClick={()=>{setCategory(item.KayitNo);setPortionProduct(null);}}>{item.GrupAdi}</button>)}
       </div>
       <div className="table-product-options">
         <label>Sıradaki ürün için not<input maxLength={250} value={note} onChange={event=>setNote(event.target.value)} placeholder="Örn. soğansız, az pişmiş"/></label>
+        {quickNotes.length>0&&<div className="op-chip-row" role="group" aria-label="Hazır notlar">{quickNotes.map(item=><button type="button" key={item} className="op-chip"
+          aria-pressed={note.split(',').some(part=>part.trim().toLocaleLowerCase('tr')===item.toLocaleLowerCase('tr'))}
+          onClick={()=>setNote(current=>toggleQuickNote(current,item).slice(0,250))}>{item}</button>)}</div>}
         <div className="table-product-quantity" role="group" aria-label="Seçilecek adet"><span>Adet</span><button type="button" aria-label="Adedi azalt" disabled={quantity===1||confirm.isPending} onClick={()=>setQuantity(value=>value-1)}><Minus size={19}/></button><strong>{quantity}</strong><button type="button" aria-label="Adedi artır" disabled={quantity===50||confirm.isPending} onClick={()=>setQuantity(value=>value+1)}><Plus size={19}/></button></div>
       </div>
     </div>
@@ -424,14 +498,17 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
       <div>{portionProduct.Porsiyonlar.map(portion=><button type="button" key={portion.KayitNo} disabled={confirm.isPending||draft.length>=50} onClick={()=>select(portionProduct,portion.KayitNo)}><span>{portion.PorsiyonAdi}</span><b>{money(portion.Fiyat)}</b></button>)}</div>
       <button type="button" className="table-product-portions-cancel" onClick={()=>setPortionProduct(null)}>Vazgeç</button>
     </section>}
+    {optionTarget&&<OptionChooser key={`${optionTarget.product.KayitNo}-${optionTarget.portionId??0}`} product={optionTarget.product}
+      basePrice={optionTarget.product.Porsiyonlar.find(item=>item.KayitNo===optionTarget.portionId)?.Fiyat??optionTarget.product.SatisFiyati}
+      disabled={confirm.isPending||draft.length>=50} onCancel={()=>setOptionTarget(null)} onConfirm={ids=>select(optionTarget.product,optionTarget.portionId,ids)}/>}
     <div className="table-product-catalog" aria-label="Menü ürünleri">
       {menu.isPending?<Loading/>:products.length===0?<Empty>Bu aramada ürün bulunamadı.</Empty>:
-        <div className="table-product-grid">{products.map(product=><button type="button" key={product.KayitNo} className="table-product-card" aria-pressed={portionProduct?.KayitNo===product.KayitNo} disabled={confirm.isPending||draft.length>=50} onClick={()=>select(product)}><span>{product.GrupAdi}</span><strong>{product.StokAdi}</strong><span className="table-product-card-bottom"><b>{money(product.SatisFiyati)}</b><Plus size={21} aria-hidden="true"/></span>{product.Porsiyonlar.length>0&&<small>{product.Porsiyonlar.length} porsiyon seçeneği</small>}</button>)}</div>}
+        <div className="table-product-grid">{products.map(product=><button type="button" key={product.KayitNo} className="table-product-card" aria-pressed={portionProduct?.KayitNo===product.KayitNo} disabled={confirm.isPending||draft.length>=50} onClick={()=>select(product)}><span>{product.GrupAdi}</span><strong>{product.StokAdi}</strong><span className="table-product-card-bottom"><b>{money(product.SatisFiyati)}</b><Plus size={21} aria-hidden="true"/></span>{product.Porsiyonlar.length>0&&<small>{product.Porsiyonlar.length} porsiyon seçeneği</small>}{(product.SecenekGruplari?.length??0)>0&&<small>{product.SecenekGruplari!.some(group=>group.Zorunlu)?'Seçim gerekli':'Ekstra seçenekli'}</small>}</button>)}</div>}
     </div>
     {draft.length>0&&<section className="table-product-draft" aria-label="Onay bekleyen ürünler">
       <div className="table-product-draft-head"><strong>Onay bekleyenler</strong><span>{draftAmount} adet · henüz adisyona eklenmedi</span></div>
       <div className="table-product-draft-list">{draft.map(line=><div className="table-product-draft-row" key={line.id}>
-        <div><strong>{line.amount} × {line.product.StokAdi}{line.portionName?` · ${line.portionName}`:''}</strong>{line.note&&<small>Not: {line.note}</small>}</div>
+        <div><strong>{line.amount} × {line.product.StokAdi}{line.portionName?` · ${line.portionName}`:''}</strong>{line.optionText&&<small>{line.optionText}</small>}{line.note&&<small>Not: {line.note}</small>}</div>
         <button type="button" className="secondary" disabled={confirm.isPending} aria-label={`${line.product.StokAdi} seçimini sil`} onClick={()=>{confirm.reset();setConfirmDiscard(false);setDraft(lines=>lines.filter(item=>item.id!==line.id));}}><Trash2 size={18}/> Sil</button>
       </div>)}</div>
     </section>}
@@ -695,7 +772,7 @@ function MergeModal({receipt,table,allTables,onClose}:{receipt:Receipt;table:Tab
 }
 
 // ───── KISMİ ÖDEME & POS CİHAZ ENTEGRASYONU MODALI ─────
-function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClose:()=>void}){
+function PaymentModal({receipt,table,mealCards,onClose}:{receipt:Receipt;table:Table;mealCards:MealCard[];onClose:()=>void}){
   const client=useQueryClient();
 
   const oncekiNakit=receipt.NakitToplam??0;
@@ -706,7 +783,10 @@ function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClo
   const oncekiOdenen=oncekiNakit+oncekiBanka+oncekiCari+oncekiYemek+oncekiIndirim;
   const kalanTutar=Math.max(0,receipt.GenelToplam-oncekiOdenen);
 
-  const [isPartial,setIsPartial]=useState(false);
+  const [mode,setMode]=useState<'full'|'partial'|'equal'|'items'>('full');
+  const isPartial=mode==='partial';
+  const [mealCardId,setMealCardId]=useState('');
+  const activeMealCards=mealCards.filter(card=>card.Aktif);
   const [cash,setCash]=useState(kalanTutar.toFixed(2));
   const [card,setCard]=useState('0');
   const [account,setAccount]=useState('0');
@@ -733,7 +813,8 @@ function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClo
   const validTotal=allParsed&&(isPartial?(centsSum>0&&centsSum<=centsKalan):(centsSum===centsKalan));
   const needsIntegratedPos=centsCard!==null&&centsCard>0&&(posDevice===1||posDevice===2);
   const posApproved=needsIntegratedPos?posTx?.Basarili===true:true;
-  const canSubmit=validTotal&&posApproved;
+  const needsMealCard=centsMealCard!==null&&centsMealCard>0&&activeMealCards.length>0&&!mealCardId;
+  const canSubmit=validTotal&&posApproved&&!needsMealCard;
 
   const quickFill=(type:'cash'|'card'|'mealCard')=>{
     const remaining=kalanTutar.toFixed(2);
@@ -799,7 +880,8 @@ function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClo
       YemekKartiTutar:centsMealCard!/100,
       IndirimTutar:centsDiscount!/100,
       KismiOdeme:isPartial,
-      PosIslemId:posTx?.IslemId
+      PosIslemId:posTx?.IslemId,
+      YemekKartiKayitNo:centsMealCard&&mealCardId?Number(mealCardId):null
     }),
     onSuccess:async()=>{
       await client.invalidateQueries();
@@ -812,21 +894,23 @@ function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClo
       <div className="payment-type-tabs">
         <button
           type="button"
-          className={!isPartial?'active':''}
+          className={mode==='full'?'active':''}
           onClick={()=>{
-            setIsPartial(false);
+            setMode('full');
             quickFill('cash');
           }}
         >
-          Tam Ödeme (Hesabı Kapat)
+          Tam ödeme
         </button>
         <button
           type="button"
           className={isPartial?'active':''}
-          onClick={()=>setIsPartial(true)}
+          onClick={()=>setMode('partial')}
         >
-          Kısmi Ödeme (Hesap Açık Kalsın)
+          Kısmi ödeme
         </button>
+        <button type="button" className={mode==='equal'?'active':''} onClick={()=>setMode('equal')}>Eşit böl</button>
+        <button type="button" className={mode==='items'?'active':''} onClick={()=>setMode('items')}>Ürün seçerek</button>
       </div>
 
       <div className="payment-breakdown-card">
@@ -852,6 +936,9 @@ function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClo
         </div>
       </div>
 
+      {mode==='equal'||mode==='items'?(
+        <SplitPaymentPanel key={mode} mode={mode} receipt={receipt} table={table} mealCards={mealCards} onClosed={onClose}/>
+      ):<>
       <div className="payment-shortcuts">
         <button type="button" onClick={()=>quickFill('cash')}>
           <Banknote size={15}/> Tamamı nakit
@@ -895,6 +982,15 @@ function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClo
             disabled={payMutation.isPending}
           />
         </label>
+        {centsMealCard!==null&&centsMealCard>0&&activeMealCards.length>0&&(
+          <label>
+            Yemek kartı türü
+            <select value={mealCardId} onChange={e=>setMealCardId(e.target.value)} disabled={payMutation.isPending}>
+              <option value="">Kart seçin</option>
+              {activeMealCards.map(card=><option key={card.KayitNo} value={card.KayitNo}>{card.Ad}</option>)}
+            </select>
+          </label>
+        )}
         <label>
           Cari Hesap
           <input
@@ -1028,6 +1124,8 @@ function PaymentModal({receipt,table,onClose}:{receipt:Receipt;table:Table;onClo
           {payMutation.isPending?'Kaydediliyor…':isPartial?'Kısmi ödemeyi kaydet':'Ödemeyi tamamla'}
         </button>
       </div>
+      {needsMealCard&&<p role="status" className="error-text">Yemek kartı ödemesi için kart türünü seçin.</p>}
+      </>}
     </Modal>
   );
 }

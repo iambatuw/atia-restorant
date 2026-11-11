@@ -15,7 +15,10 @@ import {
   RefreshCw,
   ArrowUpRight,
   Clock,
-  Settings2
+  Settings2,
+  ReceiptText,
+  Boxes,
+  UsersRound
 } from 'lucide-react';
 import type {Health,Session} from './types';
 import {api,ApiError,setToken} from './api';
@@ -34,6 +37,9 @@ import {canAccess,defaultPage,pageFromPath,pagePath} from './routes';
 import type {Page} from './routes';
 
 const Management=lazy(()=>import('./Management'));
+const ReceiptsPage=lazy(()=>import('./ReceiptsPage'));
+const StockPage=lazy(()=>import('./StockPage'));
+const StaffPage=lazy(()=>import('./StaffPage'));
 export default function App(){
   const [path,setPath]=useState(()=>location.pathname);
   const publicMenu=path.replace(/\/$/,'')==='/menu';
@@ -159,7 +165,10 @@ export default function App(){
     {id:'paket-servis',label:'Paket servis',icon:Truck,allowed:session.Rol!=='Mutfak'},
     {id:'mutfak',label:'Mutfak',icon:ChefHat,allowed:session.Rol!=='Garson'},
     {id:'menu',label:'Menü',icon:BookOpen,allowed:true},
-    {id:'raporlar',label:'Günlük rapor',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
+    {id:'raporlar',label:'Raporlar',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
+    {id:'adisyonlar',label:'Adisyonlar',icon:ReceiptText,allowed:session.Rol==='Admin'},
+    {id:'stok',label:'Stok ve maliyet',icon:Boxes,allowed:session.Rol==='Admin'},
+    {id:'personel',label:'Personel',icon:UsersRound,allowed:session.Rol==='Admin'},
     {id:'entegrasyonlar',label:'Entegrasyonlar',icon:PlugZap,allowed:session.Rol==='Admin'},
     {id:'rezervasyonlar',label:'Rezervasyonlar',icon:CalendarDays,allowed:session.Rol==='Admin'},
     {id:'ayarlar',label:'Ayarlar',icon:Settings2,allowed:session.Rol==='Admin'}
@@ -221,7 +230,7 @@ export default function App(){
 
         {health.data?.Mode==='Demo'&&(
           <div className="op-demo-notice" role="status">
-            <strong>Demo veri</strong><span>İşlemler sunucu yeniden başlatıldığında sıfırlanır.</span>
+            <strong>Demo veri</strong><span>{health.data.KaliciDemo?'Gerçek veritabanına bağlı değil. Kayıtlar yalnızca bu sunucudaki demo dosyasında saklanır.':'İşlemler sunucu yeniden başlatıldığında sıfırlanır.'}</span>
           </div>
         )}
 
@@ -232,7 +241,7 @@ export default function App(){
             ):page==='masalar'?(
               <Tables session={session} path={path} navigate={navigate}/>
             ):page==='paket-servis'?(
-              <DeliveryPage/>
+              <DeliveryPage admin={session.Rol==='Admin'}/>
             ):page==='mutfak'?(
               <Kitchen/>
             ):page==='menu'?(
@@ -241,6 +250,12 @@ export default function App(){
               <Integrations navigate={p=>navigate(pagePath(p))}/>
             ):page==='ayarlar'?(
               <SettingsPage/>
+            ):page==='adisyonlar'?(
+              <ReceiptsPage/>
+            ):page==='stok'?(
+              <StockPage/>
+            ):page==='personel'?(
+              <StaffPage session={session}/>
             ):(
               <Management page={page as 'raporlar'|'rezervasyonlar'}/>
             )}

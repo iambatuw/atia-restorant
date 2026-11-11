@@ -1,19 +1,28 @@
 import {useEffect,useState} from 'react';
+import type {ReactNode} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {CalendarDays,Plus,Trash2} from 'lucide-react';
 import {api,localDate,money,toCents} from './api';
-import type {AuditEntry,Report,Reservation,Table} from './types';
+import type {AuditEntry,FullReport,Reservation,Table} from './types';
 import {Empty,ErrorBox,Loading,Modal} from './ui';
+import {DailyExtras,PeriodReportView,ReportTabs,StaffReportView} from './ReportsExtra';
+import type {ReportTab} from './ReportsExtra';
 
-export default function Management({page}:{page:'raporlar'|'rezervasyonlar'}){return page==='raporlar'?<Reports/>:<Reservations/>;}
+export default function Management({page}:{page:'raporlar'|'rezervasyonlar'}){return page==='raporlar'?<ReportsHub/>:<Reservations/>;}
 
-function Reports(){
+function ReportsHub(){
+  const [tab,setTab]=useState<ReportTab>('gunluk');
+  const tabs=<ReportTabs tab={tab} setTab={setTab}/>;
+  return tab==='gunluk'?<Reports tabs={tabs}/>:tab==='donem'?<PeriodReportView tabs={tabs}/>:<StaffReportView tabs={tabs}/>;
+}
+
+function Reports({tabs}:{tabs:ReactNode}){
   const client=useQueryClient();
   const [date,setDate]=useState('');
   const [countedCash,setCountedCash]=useState('');
   const [closeNote,setCloseNote]=useState('');
   const closeShift=useMutation({mutationFn:()=>api('/raporlar/vardiya-kapat',{method:'POST',body:JSON.stringify({IsletmeTarihi:date,SayilanNakit:toCents(countedCash)!/100,Aciklama:closeNote.trim()})}),onSuccess:()=>client.invalidateQueries()});
-  const report=useQuery({queryKey:['report',date],queryFn:()=>api<Report>(`/raporlar/gunluk${date?`?tarih=${date}`:''}`),refetchInterval:15000});
+  const report=useQuery({queryKey:['report',date],queryFn:()=>api<FullReport>(`/raporlar/gunluk${date?`?tarih=${date}`:''}`),refetchInterval:15000});
   const history=useQuery({queryKey:['audit',date],queryFn:()=>api<AuditEntry[]>(`/raporlar/islemler?tarih=${date}`),enabled:!!date,refetchInterval:15000});
   useEffect(()=>{if(!date&&report.data?.IsletmeTarihi)setDate(report.data.IsletmeTarihi);},[date,report.data?.IsletmeTarihi]);
   const data=report.data;
@@ -21,11 +30,12 @@ function Reports(){
   const maxHour=Math.max(1,...(data?.SaatlikCiro.map(hour=>hour.Ciro)??[]));
   return <section className="op-page op-report" aria-label="Günlük rapor">
     <header className="op-page-head"><div><h1>Günlük rapor</h1><p>İşletme günü {data?`${String(data.BaslangicSaati).padStart(2,'0')}:00`:'—'} saatinde başlar; ertesi gün aynı saate kadar sürer.</p></div><label className="op-date-field">İşletme tarihi <input type="date" value={date} max={localDate()} onChange={e=>setDate(e.target.value)}/></label></header>
+    {tabs}
     <ErrorBox error={report.error} retry={()=>void report.refetch()}/>
     <ErrorBox error={history.error} retry={()=>void history.refetch()}/>
     {report.isPending?<Loading/>:data&&<>
       <div className="op-report-lead"><div><span>Toplam satış</span><strong>{money(data.GenelSatis)}</strong><small>Masa ve teslim edilen paketler</small></div><div><span>Masa satışı</span><strong>{money(data.ToplamCiro)}</strong><small>{data.ToplamAdisyon} kapanan adisyon</small></div><div><span>Paket satışı</span><strong>{money(data.PaketCiro)}</strong><small>{data.TeslimEdilenPaket} teslim edilen sipariş</small></div></div>
-      <section className="op-panel op-package-report"><div className="op-panel-head"><h2>Paket servis özeti</h2><small>Teslim tarihi esas alınır</small></div><div className="op-report-rows"><div><span>Teslim edilen</span><strong>{data.TeslimEdilenPaket}</strong></div><div><span>İptal edilen</span><strong>{data.IptalEdilenPaket}</strong></div><div><span>Bu gün açılmış, devam eden</span><strong>{data.AcikPaket}</strong></div></div><p>Ödeme şekli siparişe yazılır; tahsilat doğrulanmadığı için paket tutarı kasa mutabakatına eklenmez.</p></section>
+      <section className="op-panel op-package-report"><div className="op-panel-head"><h2>Paket servis özeti</h2><small>Teslim tarihi esas alınır</small></div><div className="op-report-rows"><div><span>Teslim edilen</span><strong>{data.TeslimEdilenPaket}</strong></div><div><span>İptal edilen</span><strong>{data.IptalEdilenPaket}</strong></div><div><span>Bu gün açılmış, devam eden</span><strong>{data.AcikPaket}</strong></div></div><p>Teslim edilen paketin ödemesi yönetici “Tahsil edildi” dediğinde kayda geçer; nakit paket tahsilatı beklenen kasa nakdine eklenir.</p></section>
       <div className="op-report-columns"><section className="op-panel"><div className="op-panel-head"><h2>İşletme günü tahsilatları</h2></div><div className="op-report-rows">{payments.map(([name,value])=><div key={name}><span>{name}</span><strong>{money(value)}</strong></div>)}{data.Mutabakat.Indirim>0&&<div><span>İndirim</span><strong>{money(data.Mutabakat.Indirim)}</strong></div>}</div></section>
       <section className="op-panel"><div className="op-panel-head"><h2>En çok satan ürünler</h2></div>{data.EnCokSatan.length?<div className="op-report-rows">{data.EnCokSatan.slice(0,8).map(item=><div key={item.StokAdi}><span>{item.StokAdi}<small>{item.ToplamMiktar} adet</small></span><strong>{money(item.ToplamTutar)}</strong></div>)}</div>:<div className="op-inline-empty">Bu tarihte ürün satışı yok.</div>}</section></div>
       <section className="op-panel op-hour-panel"><div className="op-panel-head"><h2>Saatlik kapanan satış</h2></div>{data.SaatlikCiro.length?<div className="op-hours">{data.SaatlikCiro.map(hour=><div key={hour.Saat}><span>{String(hour.Saat).padStart(2,'0')}:00</span><div><i style={{width:`${Math.max(2,hour.Ciro/maxHour*100)}%`}}/></div><strong>{money(hour.Ciro)}</strong></div>)}</div>:<div className="op-inline-empty">Bu tarihte kapanan satış yok.</div>}</section>
@@ -36,14 +46,16 @@ function Reports(){
         <div><span>İndirim</span><strong>{money(data.Mutabakat.Indirim)}</strong></div>
         <div><span>İptal / zayi / ikram <small>Bilgi amaçlı; tahsilata eklenmez</small></span><strong>{[data.Mutabakat.IptalTutari,data.Mutabakat.ZayiTutari,data.Mutabakat.IkramTutari].map(money).join(' / ')}</strong></div>
         <div><span>Satış − tahsilat <small>Farklı günlerde alınan kısmi ödemeler fark oluşturabilir</small></span><strong>{money(data.Mutabakat.Fark)}</strong></div>
+        {data.Mutabakat.IadeTutari>0&&<div><span>İade <small>Kapanan satıştan ve tahsilattan düşüldü</small></span><strong>-{money(data.Mutabakat.IadeTutari)}</strong></div>}
       </div></section>
+      <DailyExtras collection={data.PaketTahsilat} couriers={data.KuryeOzeti} vat={data.KdvDokumu} mealCards={data.YemekKartiDagilimi} refunds={data.Mutabakat.IadeTutari}/>
       <section className="op-panel op-shift-close"><div className="op-panel-head"><h2>Vardiya kapanışı</h2></div>
         {data.VardiyaKapanisi?<div className="op-report-rows"><div><span>Kapatan · {data.VardiyaKapanisi.PersonelAdi}</span><strong>{new Date(data.VardiyaKapanisi.KapanisZamani).toLocaleString('tr-TR')}</strong></div><div><span>Beklenen / sayılan nakit</span><strong>{money(data.VardiyaKapanisi.BeklenenNakit)} / {money(data.VardiyaKapanisi.SayilanNakit)}</strong></div><div><span>Nakit farkı</span><strong>{money(data.VardiyaKapanisi.NakitFarki)}</strong></div>{data.VardiyaKapanisi.Aciklama&&<div><span>Not</span><strong>{data.VardiyaKapanisi.Aciklama}</strong></div>}</div>:
-        date<data.Bugun?<div className="op-shift-form"><p>Beklenen nakit {money(data.Mutabakat.Nakit)}. Sayılan nakdi girerek tamamlanmış işletme gününü kapatın.</p><label>Sayılan nakit<input inputMode="decimal" value={countedCash} onChange={e=>setCountedCash(e.target.value)} placeholder="0,00"/></label><label>Not (isteğe bağlı)<input maxLength={500} value={closeNote} onChange={e=>setCloseNote(e.target.value)} placeholder="Fark varsa açıklayın"/></label><ErrorBox error={closeShift.error}/><button type="button" className="primary" disabled={closeShift.isPending||toCents(countedCash)===null} onClick={()=>closeShift.mutate()}>{closeShift.isPending?'Kaydediliyor…':'Vardiyayı kapat'}</button></div>:
+        date<data.Bugun?<div className="op-shift-form"><p>Beklenen nakit {money(data.BeklenenKasaNakdi)} (masa {money(data.Mutabakat.Nakit)} + paket {money(data.PaketTahsilat.Nakit)}). Sayılan nakdi girerek tamamlanmış işletme gününü kapatın.</p><label>Sayılan nakit<input inputMode="decimal" value={countedCash} onChange={e=>setCountedCash(e.target.value)} placeholder="0,00"/></label><label>Not (isteğe bağlı)<input maxLength={500} value={closeNote} onChange={e=>setCloseNote(e.target.value)} placeholder="Fark varsa açıklayın"/></label><ErrorBox error={closeShift.error}/><button type="button" className="primary" disabled={closeShift.isPending||toCents(countedCash)===null} onClick={()=>closeShift.mutate()}>{closeShift.isPending?'Kaydediliyor…':'Vardiyayı kapat'}</button></div>:
         <div className="op-inline-empty">Bu işletme günü henüz devam ediyor. Kapanış başlangıç saatinden sonra yapılabilir.</div>}
       </section>
-      <section className="op-panel op-audit"><div className="op-panel-head"><h2>İşlem geçmişi</h2><small>Yalnızca yöneticiler</small></div>{history.isPending?<Loading/>:history.data?.length?<div className="op-audit-list">{history.data.map(item=><div className="op-audit-row" key={item.KayitNo}><time dateTime={item.Tarih}>{new Date(item.Tarih).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</time><div><strong>{item.Islem}</strong><span>{item.Aciklama}</span></div><span>{item.PersonelAdi}</span>{item.Tutar>0&&<b>{money(item.Tutar)}</b>}</div>)}</div>:<div className="op-inline-empty">Bu tarihte kayıtlı işlem yok.</div>}</section>
-      <p className="op-report-note">Kasa mutabakatı yalnızca tahsilatı kaydedilmiş masa adisyonlarını kapsar.</p>
+      <section className="op-panel op-audit"><div className="op-panel-head"><h2>İşlem geçmişi</h2><small>Yalnızca yöneticiler</small></div>{history.isPending?<Loading/>:history.data?.length?<div className="op-audit-list">{history.data.map(item=><div className="op-audit-row" key={item.KayitNo}><time dateTime={item.Tarih}>{new Date(item.Tarih).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</time><div><strong>{item.Islem}</strong><span>{item.Aciklama}</span></div><span>{item.PersonelAdi}</span>{item.Tutar!==0&&<b>{money(item.Tutar)}</b>}</div>)}</div>:<div className="op-inline-empty">Bu tarihte kayıtlı işlem yok.</div>}</section>
+      <p className="op-report-note">Masa mutabakatı tahsilatı kaydedilmiş masa adisyonlarını, ödeme düzeltmelerini ve iadeleri kapsar. Paket tahsilatı ayrı gösterilir.</p>
     </>}
   </section>;
 }
