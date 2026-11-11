@@ -101,7 +101,7 @@
 
 /* ─── RESET & BASE ─────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
-html { min-width: 320px; scroll-behavior: smooth; }
+html { min-width: 0; scroll-behavior: smooth; }
 
 body {
   margin: 0;
@@ -113,7 +113,7 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
+button { min-height: 44px; cursor: pointer; touch-action: manipulation; }
 button:disabled { cursor: not-allowed; opacity: .5; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -138,7 +138,7 @@ small { font-size: .82rem; }
   align-items: center;
   justify-content: center;
   gap: .45rem;
-  min-height: 40px;
+  min-height: 44px;
   border-radius: 8px;
   border: 1px solid transparent;
   padding: .5rem .9rem;
@@ -179,8 +179,8 @@ small { font-size: .82rem; }
 .full { width: 100%; }
 
 .icon-button {
-  width: 38px;
-  min-height: 38px;
+  width: 44px;
+  min-height: 44px;
   padding: 0;
   background: transparent;
   border-color: var(--line);
@@ -190,7 +190,7 @@ small { font-size: .82rem; }
 
 /* ─── FORM ELEMENTS ────────────────────────────────────────────────────────── */
 input, select, textarea {
-  min-height: 40px;
+  min-height: 44px;
   width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -208,6 +208,9 @@ input::placeholder, textarea::placeholder { color: var(--ink-faint); }
 input[type="checkbox"], input[type="radio"] {
   width: 18px; height: 18px; min-height: 0;
   margin: 0; accent-color: var(--accent); cursor: pointer;
+}
+@media (max-width: 800px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
 }
 label { color: var(--ink-soft); font-weight: 600; font-size: .88rem; }
 label input, label select, label textarea { margin-top: .3rem; font-weight: 400; }

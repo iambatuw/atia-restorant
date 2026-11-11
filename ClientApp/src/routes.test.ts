@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {canAccess,defaultPage,pageFromPath,pagePath} from './routes';
+import {canAccess,defaultPage,pageFromPath,pagePath,tablePath,tableRouteFromPath} from './routes';
 
 describe('staff routes',()=>{
   it('distinguishes the public menu from staff pages',()=>{
@@ -20,5 +20,12 @@ describe('staff routes',()=>{
     expect(canAccess('paket-servis','Garson')).toBe(true);
     expect(canAccess('paket-servis','Mutfak')).toBe(false);
     expect(pageFromPath('/app/rezervasyonlar')).toBe('rezervasyonlar');
+  });
+  it('opens a table and its product picker as direct staff pages',()=>{
+    expect(tablePath(12)).toBe('/app/masalar/12');
+    expect(tablePath(12,true)).toBe('/app/masalar/12/urun-ekle');
+    expect(tableRouteFromPath('/app/masalar/12/urun-ekle/')).toEqual({tableId:12,picker:true});
+    expect(pageFromPath('/app/masalar/12/urun-ekle')).toBe('masalar');
+    expect(tableRouteFromPath('/app/masalar/0/urun-ekle')).toBeNull();
   });
 });

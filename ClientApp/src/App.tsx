@@ -227,7 +227,7 @@ export default function App(){
             {page==='genel-bakis'?(
               <Overview navigate={p=>navigate(pagePath(p))}/>
             ):page==='masalar'?(
-              <Tables session={session}/>
+              <Tables session={session} path={path} navigate={navigate}/>
             ):page==='paket-servis'?(
               <DeliveryPage/>
             ):page==='mutfak'?(
