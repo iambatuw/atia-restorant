@@ -21,7 +21,7 @@ describe('staff routes',()=>{
     expect(canAccess('paket-servis','Mutfak')).toBe(false);
     expect(pageFromPath('/app/rezervasyonlar')).toBe('rezervasyonlar');
   });
-  it('opens a table and its product picker as direct staff pages',()=>{
+  it('keeps older product-picker links valid while opening the picker over a table',()=>{
     expect(tablePath(12)).toBe('/app/masalar/12');
     expect(tablePath(12,true)).toBe('/app/masalar/12/urun-ekle');
     expect(tableRouteFromPath('/app/masalar/12/urun-ekle/')).toEqual({tableId:12,picker:true});

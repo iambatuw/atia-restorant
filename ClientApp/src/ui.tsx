@@ -21,7 +21,7 @@ export function Empty({children}:{children:ReactNode}){
  return <div className="empty">{children}</div>;
 }
 
-export function Modal({title,children,onClose,preventClose=false}:{title:string;children:ReactNode;onClose:()=>void;preventClose?:boolean}){
+export function Modal({title,children,onClose,preventClose=false,className}:{title:string;children:ReactNode;onClose:()=>void;preventClose?:boolean;className?:string}){
  const ref=useRef<HTMLDialogElement>(null);
  const titleId=useId();
 
@@ -39,6 +39,7 @@ export function Modal({title,children,onClose,preventClose=false}:{title:string;
  return (
   <dialog
    ref={ref}
+   className={className}
    aria-labelledby={titleId}
    onCancel={e=>{
     if(preventClose){

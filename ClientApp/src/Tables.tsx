@@ -18,7 +18,7 @@ import {
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
-import type {OrderLine,Product,Receipt,Section,Session,Table,PosCihazTipi,PosIslemKayit} from './types';
+import type {Category,OrderLine,Product,Receipt,Section,Session,Table,PosCihazTipi,PosIslemKayit} from './types';
 import {
   api,
   money,
@@ -32,7 +32,6 @@ import {
   posIslemSimuleSonuc
 } from './api';
 import {Empty,ErrorBox,Loading,Modal} from './ui';
-import {MenuPage} from './MenuPage';
 import {tablePath,tableRouteFromPath} from './routes';
 
 export function Tables({session,path,navigate}:{session:Session;path:string;navigate:(path:string)=>void}){
@@ -41,9 +40,10 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
   const [section,setSection]=useState<number|null>(null);
   const [status,setStatus]=useState('all');
   const [search,setSearch]=useState('');
+  const [pickerTable,setPickerTable]=useState<number|null>(null);
   const selectedRoute=tableRouteFromPath(path);
   const selected=selectedRoute?.tableId??null;
-  const picker=!!selectedRoute?.picker;
+  const picker=!!selectedRoute?.picker||(selected!==null&&pickerTable===selected);
 
   const table=tables.data?.find(t=>t.MasaId===selected);
   const visible=(tables.data??[]).filter(t=>
@@ -57,11 +57,6 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
   if (selected!==null&&!table) return (
     <section className="op-page"><ErrorBox error={tables.error} retry={()=>void tables.refetch()}/>{tables.isPending?<Loading/>:!tables.error&&<Empty>Masa bulunamadı. <button className="secondary" onClick={()=>navigate('/app/masalar')}>Masalara dön</button></Empty>}</section>
   );
-  if (picker&&table) return (
-    <TableOrder key={table.MasaId} table={table} admin={session.Rol==='Admin'} allTables={tables.data??[]}
-      close={()=>navigate('/app/masalar')} picker onOpenPicker={()=>navigate(tablePath(table.MasaId,true))} onClosePicker={()=>navigate(tablePath(table.MasaId))}/>
-  );
-
   return (
     <section className={`op-page op-floor-page ${table?'has-table':''}`} aria-label="Masalar">
       <header className="op-page-head"><div><h1>Masalar</h1><p>Salonun anlık durumu ve açık adisyonlar</p></div><div className="op-head-count"><strong>{occupied}</strong><span>dolu</span><strong>{available}</strong><span>boş</span></div></header>
@@ -99,7 +94,9 @@ export function Tables({session,path,navigate}:{session:Session;path:string;navi
         </section>
         {table?(
           <TableOrder key={table.MasaId} table={table} admin={session.Rol==='Admin'} allTables={tables.data??[]}
-            close={()=>navigate('/app/masalar')} picker={false} onOpenPicker={()=>navigate(tablePath(table.MasaId,true))} onClosePicker={()=>navigate(tablePath(table.MasaId))}/>
+            close={()=>{setPickerTable(null);navigate('/app/masalar');}} picker={picker}
+            onOpenPicker={()=>setPickerTable(table.MasaId)}
+            onClosePicker={()=>{setPickerTable(null);if(selectedRoute?.picker)navigate(tablePath(table.MasaId));}}/>
         ):(
           <aside className="op-check-placeholder"><ReceiptText size={28}/><h2>Adisyon</h2><p>Siparişleri görmek veya yeni adisyon açmak için bir masa seçin.</p></aside>
         )}
@@ -121,8 +118,6 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
   const [cancel,setCancel]=useState<OrderLine|null>(null);
   const [removalReason,setRemovalReason]=useState('');
   const [removalType,setRemovalType]=useState<0|1>(0);
-  const [note,setNote]=useState('');
-  const [portionProduct,setPortionProduct]=useState<Product|null>(null);
 
   const receipt=useQuery({
     queryKey:['receipt',table.MasaId],
@@ -148,14 +143,6 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
   const busy=mutation.isPending||transferMutation.isPending;
   const order=receipt.data;
 
-  const add=(p:Product,portionId?:number)=>{
-    if (p.Porsiyonlar?.length && portionId===undefined) { setPortionProduct(p); return; }
-    mutation.mutate(
-      {path:'/siparisler',method:'POST',body:{MasaKayitNo:table.MasaId,StokKayitNo:p.KayitNo,PorsiyonKayitNo:portionId,Miktar:1,SatirAciklama:note}},
-      {onSuccess:()=>{setPortionProduct(null);setNote('');onClosePicker();}}
-    );
-  };
-
   const change=(line:OrderLine,delta:number)=>{
     if(line.Miktar+delta<=0){
       setCancel(line);
@@ -168,27 +155,8 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
     });
   };
 
-  if (picker) return (
-    <section className="op-page op-product-page" aria-label={`${table.MasaAdi} için ürün ekle`}>
-      <header className="op-product-head">
-        <button type="button" className="secondary op-product-back" disabled={busy} onClick={onClosePicker}><ArrowLeft size={20}/> Adisyona dön</button>
-        <div><p>{table.RestorantBolumAdi} · {table.MasaAdi}</p><h1>Menüden ürün ekle</h1></div>
-      </header>
-      <div className="op-product-content">
-        <label className="op-product-note">Sipariş notu<input maxLength={250} value={note} onChange={e=>setNote(e.target.value)} placeholder="Örn. soğansız, az pişmiş"/></label>
-        <ErrorBox error={mutation.error}/>
-        {portionProduct ? <div className="op-portion-picker">
-          <h2>{portionProduct.StokAdi}</h2>
-          <p>Porsiyon seçin</p>
-          <div className="transfer-list">{portionProduct.Porsiyonlar.map(portion=><button key={portion.KayitNo} disabled={busy} onClick={()=>add(portionProduct,portion.KayitNo)}>{portion.PorsiyonAdi} <span>{money(portion.Fiyat)}</span></button>)}</div>
-          <button type="button" className="secondary" disabled={busy} onClick={()=>setPortionProduct(null)}><ArrowLeft size={18}/> Ürünlere dön</button>
-        </div> : <MenuPage onAdd={add} busy={busy}/>}
-        {busy&&<p role="status">Sipariş ekleniyor…</p>}
-      </div>
-    </section>
-  );
-
   return (
+    <>
     <aside className="order-panel guest-check-panel fresh-check">
       <header className="fresh-check-heading">
         <div>
@@ -372,7 +340,73 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
         <MergeModal receipt={order} table={table} allTables={allTables} onClose={()=>setMerge(false)}/>
       )}
     </aside>
+    {picker&&<TableProductPicker table={table} onClose={onClosePicker}/>}
+    </>
   );
+}
+
+function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
+  const client=useQueryClient();
+  const menu=useQuery({queryKey:['menu','public'],queryFn:()=>api<Category[]>('/menu')});
+  const [category,setCategory]=useState<number|null>(null);
+  const [search,setSearch]=useState('');
+  const [quantity,setQuantity]=useState(1);
+  const [note,setNote]=useState('');
+  const [portionProduct,setPortionProduct]=useState<Product|null>(null);
+  const [added,setAdded]=useState(0);
+  const [lastAdded,setLastAdded]=useState('');
+  const add=useMutation({
+    mutationFn:({product,portionId,amount,orderNote}:{product:Product;portionId?:number;amount:number;orderNote:string})=>
+      api('/siparisler',{method:'POST',body:JSON.stringify({MasaKayitNo:table.MasaId,StokKayitNo:product.KayitNo,
+        PorsiyonKayitNo:portionId,Miktar:amount,SatirAciklama:orderNote})}),
+    onSuccess:async(_,item)=>{
+      setAdded(count=>count+item.amount);
+      setLastAdded(`${item.amount} × ${item.product.StokAdi} adisyona eklendi`);
+      setPortionProduct(null);
+      setNote('');
+      setQuantity(1);
+      await client.invalidateQueries({queryKey:['receipt',table.MasaId]});
+      await client.invalidateQueries({queryKey:['tables']});
+    }
+  });
+  const categories=menu.data??[];
+  const query=search.trim().toLocaleLowerCase('tr');
+  const products=categories.filter(item=>category===null||item.KayitNo===category)
+    .flatMap(item=>item.Urunler)
+    .filter(product=>product.StokAdi.toLocaleLowerCase('tr').includes(query));
+  const select=(product:Product,portionId?:number)=>{
+    if(add.isPending)return;
+    add.reset();
+    setLastAdded('');
+    if(product.Porsiyonlar.length>0&&portionId===undefined){setPortionProduct(product);return;}
+    add.mutate({product,portionId,amount:quantity,orderNote:note.trim()});
+  };
+
+  return <Modal title={`${table.MasaAdi} · Ürün ekle`} className="table-product-dialog" onClose={onClose} preventClose={add.isPending}>
+    <div className="table-product-meta"><span>{table.RestorantBolumAdi} masası</span><span>Ürünlere dokunarak adisyona ekleyin</span></div>
+    <div className="table-product-tools">
+      <label className="table-product-search"><Search size={20}/><input type="search" placeholder="Ürün ara" aria-label="Ürün ara" value={search} onChange={event=>{setSearch(event.target.value);setPortionProduct(null);}}/></label>
+      <div className="table-product-categories" role="group" aria-label="Ürün kategorileri">
+        <button type="button" aria-pressed={category===null} onClick={()=>{setCategory(null);setPortionProduct(null);}}>Tümü</button>
+        {categories.map(item=><button type="button" key={item.KayitNo} aria-pressed={category===item.KayitNo} onClick={()=>{setCategory(item.KayitNo);setPortionProduct(null);}}>{item.GrupAdi}</button>)}
+      </div>
+      <div className="table-product-options">
+        <label>Sıradaki ürün için not<input maxLength={250} value={note} onChange={event=>setNote(event.target.value)} placeholder="Örn. soğansız, az pişmiş"/></label>
+        <div className="table-product-quantity" role="group" aria-label="Eklenecek adet"><span>Adet</span><button type="button" aria-label="Adedi azalt" disabled={quantity===1||add.isPending} onClick={()=>setQuantity(value=>value-1)}><Minus size={19}/></button><strong>{quantity}</strong><button type="button" aria-label="Adedi artır" disabled={quantity===50||add.isPending} onClick={()=>setQuantity(value=>value+1)}><Plus size={19}/></button></div>
+      </div>
+    </div>
+    <ErrorBox error={menu.error||add.error} retry={menu.error?()=>void menu.refetch():undefined}/>
+    {portionProduct&&<section className="table-product-portions" aria-label={`${portionProduct.StokAdi} porsiyonları`}>
+      <div><strong>{portionProduct.StokAdi}</strong><span>Porsiyon seçin</span></div>
+      <div>{portionProduct.Porsiyonlar.map(portion=><button type="button" key={portion.KayitNo} disabled={add.isPending} onClick={()=>select(portionProduct,portion.KayitNo)}><span>{portion.PorsiyonAdi}</span><b>{money(portion.Fiyat)}</b></button>)}</div>
+      <button type="button" className="table-product-portions-cancel" onClick={()=>setPortionProduct(null)}>Vazgeç</button>
+    </section>}
+    <div className="table-product-catalog" aria-label="Menü ürünleri">
+      {menu.isPending?<Loading/>:products.length===0?<Empty>Bu aramada ürün bulunamadı.</Empty>:
+        <div className="table-product-grid">{products.map(product=><button type="button" key={product.KayitNo} className="table-product-card" aria-pressed={portionProduct?.KayitNo===product.KayitNo} disabled={add.isPending} onClick={()=>select(product)}><span>{product.GrupAdi}</span><strong>{product.StokAdi}</strong><span className="table-product-card-bottom"><b>{money(product.SatisFiyati)}</b><Plus size={21} aria-hidden="true"/></span>{product.Porsiyonlar.length>0&&<small>{product.Porsiyonlar.length} porsiyon seçeneği</small>}</button>)}</div>}
+    </div>
+    <div className="table-product-footer"><span role="status" aria-live="polite">{add.isPending?'Sipariş ekleniyor…':lastAdded||`${products.length} ürün · ${added} adet eklendi`}</span><button type="button" className="primary" disabled={add.isPending} onClick={onClose}>Adisyona dön</button></div>
+  </Modal>;
 }
 
 // ───── MASA AYIRMA MODALI ─────
