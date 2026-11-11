@@ -1,95 +1,158 @@
 # ATIA Restoran Web
 
-Birden fazla bilgisayarda veya kod ajanıyla çalışırken önce [depo çalışma kurallarını](AGENTS.md) okuyun. Değişikliğe başlamadan ve GitHub'a göndermeden hemen önce uzak `main` dalını kontrol edin; yeni commit'leri kendi işinizle birleştirin. Claude Code ve GitHub Copilot için aynı kurallara yönlendiren talimat dosyaları da depodadır.
+**ATIA masaüstü restoran uygulamasının web sürümü.** Garson, mutfak ve yönetici aynı uygulamayı tarayıcıdan, tabletten veya telefondan kullanır; müşteriler menüyü giriş yapmadan görür.
 
-ATIA'nın masaüstü restoran uygulamasını web ortamına taşıyoruz. Bu depoda personel ekranları, API ve tarayıcıda açılan müşteri menüsü birlikte duruyor. Şu anki sürüm, restoran akışlarını **demo verisiyle** denemek için çalışıyor; gerçek mağaza veritabanına bağlı değil. Demo kayıtları sunucu bilgisayarındaki `App_Data/demo-state.json` dosyasında tutulur, sunucu yeniden başlasa da kalır. Bu dosya depoya gönderilmez.
+> **Durum: demo.** Uygulama gerçek ERP veritabanına ve fiziksel cihazlara (POS, yazıcı, arayan numara) bağlı değildir. Bütün kayıtlar sunucu bilgisayarındaki demo dosyasında tutulur. Mağazada canlı tahsilat veya sipariş için kullanmayın.
 
-Arayüzde masa ve adisyon işlemleri, mutfak fişleri, paket servis, günlük rapor, menü yönetimi, gelen sipariş kutusu ve rezervasyon var. Giriş ekranı korunarak diğer personel ekranları yeniden düzenlendi. Masaüstünden hangi özelliklerin taşınmaya değer olduğunu ve hangi bağlantıların beklediğini [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) anlattık.
+---
 
-### Ekranlardan örnekler
+## İçindekiler
 
-![Gerekçeli iptal ve zayi penceresi](docs/screenshots/iptal-zayi.png)
+- [Hızlı başlangıç](#hızlı-başlangıç)
+- [Neler yapılabiliyor?](#neler-yapılabiliyor)
+- [Bir servisin akışı](#bir-servisin-akışı)
+- [Roller ve yetkiler](#roller-ve-yetkiler)
+- [Ayarlar](#ayarlar)
+- [Geliştirme](#geliştirme)
+- [Ekip çalışması](#ekip-çalışması)
+- [Sınırlar ve canlıya geçiş](#sınırlar-ve-canlıya-geçiş)
+- [Diğer belgeler](#diğer-belgeler)
 
-![Günlük rapordaki vardiya kapanışı](docs/screenshots/vardiya-kapanisi.png)
+---
 
-![Tablette masa üzerinde açılan ürün seçici](docs/screenshots/urun-secici-tablet.png)
+## Hızlı başlangıç
 
-## Bugün neler çalışıyor?
+**Gereken tek şey:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). Derlenmiş arayüz depoda (`wwwroot`) hazır olduğu için uygulamayı açmak için Node.js gerekmez.
 
-| Alan | Demo ortamında yapabilecekleriniz | Sınır |
-| --- | --- | --- |
-| Masalar ve adisyon | Bölüm veya duruma göre masa bulma; ürün, porsiyon, ekstra/seçenek ve sipariş notu ekleme; hazır notlara dokunarak not yazma; barkodla ürün ekleme; adet ve kişi sayısı değiştirme; gerekçeli iptal veya zayi; ödeme alma; masa taşıma, ayırma ve birleştirme; müşteriye bilgi fişi yazdırma | Kayıtlar yerel demo dosyasındadır, ERP veritabanına yazılmaz. Bilgi fişi mali belge değildir. |
-| Mutfak | Ürünleri ayrı ayrı hazır işaretleme; bildirimleri yazdırma kuyruğunda izleme, yazdırma denemesi ve sonucu kaydetme | Yazdırma tarayıcının yazdırma penceresini açar; başarı veya hata personel tarafından işaretlenir, fiziksel çıktı otomatik doğrulanmaz. |
-| Paket servis | Telefonla müşteri kartını bulup kayıtlı adresi seçme; ürün, seçenek ve ödeme şekliyle sipariş açma; tanımlı kuryeye verip hazırlama, yola çıkarma ve teslim etme; yöneticinin tahsilatı doğrulaması | Manuel demo akışıdır. Çevrim içi sipariş sağlayıcılarından ve arayan numara cihazından otomatik kayıt almaz. |
-| Raporlar | Günlük: masa ve paket satışı, ödeme türleri, saatlik tutarlar, iptal/zayi/ikram/iade, KDV dağılımı, yemek kartı dağılımı, paket tahsilatı, kurye hesabı, mutabakat ve vardiya kapanışı. Dönem (ay sonu): gün gün toplamlar. Personel: satış, iptal, ikram, tahsilat | Paket nakdi, yönetici “Tahsil edildi” dediğinde beklenen kasa nakdine girer. Yemek kartı komisyonu tahmindir. |
-| Rezervasyon | Tarihe göre kayıt görme, yeni rezervasyon açma ve iptal etme | Az kullanılan bir akış olduğu için ikincil menüdedir. |
-| Menü | Yöneticinin kategori, ürün, porsiyon, fiyat ve görünürlüğü düzenlemesi; personelin ürünleri araması; müşterinin `/menu` adresinden aktif ürünleri görmesi | Müşteri menüsü sipariş göndermez; değişiklikler demo belleğinde kalır. |
-| Gelen siparişler | PlatinMarket veya Entegra kaynaklı örnek siparişi elle girme, ürün kodunu eşleme ve paket servise aktarma; aynı kaynak ve sipariş numarasını ikinci kez aktarmama | Sağlayıcıdan otomatik sipariş çekmez; tek ürün satırlı demo kaydıdır. |
-| POS | Adisyon ödemesinde manuel POS veya Hugin S1/PayGo için örnek işlem ve sonuç sorgulama | Fiziksel terminale bağlanmaz. Onay adımı simülasyondur. |
-| Hesap bölme ve adisyon geçmişi | Hesabı kişi sayısına eşit bölme, ürün seçerek ödeme, kalan borcu bölme; kapanmış adisyonları inceleme, aynı gün içinde ödeme şeklini düzeltme, iade kaydetme, fişi yeniden yazdırma; adisyon numarası veya barkodla adisyonu açma | Kart iadesi fiziksel POS’ta ayrıca yapılmalıdır; burada yalnızca kayıt tutulur. |
-| Stok ve maliyet | Hammadde, reçete ve porsiyon çarpanı tanımlama; satışta reçeteye göre stok düşme (iptal geri ekler, zayi eklemez); giriş, çıkış, sayım; ağırlıklı ortalama maliyet ve ürün maliyet oranı | Satış stok yüzünden engellenmez; eksi stok uyarı olarak görünür. |
-| Personel ve ayarlar | Personel hesabı açma, rol ve şifre değiştirme, pasifleştirme; işletme bilgisi, masa ve bölüm tanımları, yazıcı/istasyon yönlendirmesi, yemek kartı türleri, hazır notlar; demo verisini başlangıca döndürme | Şifreler tuzlanmış özet olarak saklanır. Rol, durum veya şifre değişince o hesabın oturumları kapanır. |
+1. Windows'ta **[AtiaBaslat.bat](AtiaBaslat.bat)** dosyasına çift tıklayın. Sunucu açılır ve giriş sayfası tarayıcıda kendiliğinden gelir.
+2. Aşağıdaki demo hesaplarından biriyle giriş yapın.
+3. Aynı ağdaki tablet veya telefonlardan `http://SUNUCU-IP:5080/login` adresine girin. Bağlantı kurulamazsa Windows Güvenlik Duvarı'nda 5080 portuna izin verin.
 
-### Masadan ödemeye
-
-Garson veya yönetici masayı seçip menüden ürün ekleyebilir. Ürün seçici masa ekranının üzerinde açılır; tablet ve dokunmatik bilgisayarda kategori, arama, adet, porsiyon ve sipariş notu aynı panelden kullanılır. Seçilen ürünler onay bekler; **Onayla ve ekle** işleminden sonra panel açık kalır, böylece aynı masaya başka ürünler de girilebilir. Yönetici gerektiğinde ürün ikramını işaretler, adisyonu başka masaya taşır, ayırır veya birleştirir.
-
-Ödeme ekranı nakit, banka kartı, yemek kartı, cari ve indirim tutarlarını ayrı alır. Kısmi ödeme yapılırsa kalan tutar adisyonda görünür; tutar tamamlandığında adisyon kapanır. Sunucu ürün fiyatını ve ödeme toplamını denetler. Hugin S1 ve PayGo seçimi, gerçek cihazla konuşan bir bağlantı değil, işlem durumlarını denemek için hazırlanmış simülasyondur.
-
-Yönetici günlük raporda gerekçeli iptal, zayi, ikram, ödeme ve masa işlemlerini yapan personeli görebilir. İptal ve zayi tutarları ayrı gösterilir. İşletme günü varsayılan olarak 04.00'te başlar; `Restaurant__BusinessDayStartHour` ortam değişkeniyle 0–23 arasında ayarlanabilir. Tamamlanmış bir işletme günü için yönetici sayılan nakdi girip vardiyayı bir kez kapatabilir; rapor beklenen nakit ile farkı gösterir. Rezervasyonlar normal takvim gününü kullanır. Fiziksel POS veya banka iadesi henüz uygulanmadı. Ödeme şekli yalnızca adisyonun kapandığı işletme günü içinde düzeltilebilir; daha sonra iade kaydı kullanılır. Bu kayıtlar demo dosyasındadır; gerçek denetim kaydı için ERP veritabanı gerekir.
-
-### Paket siparişinin yolu
-
-Yeni siparişte müşteri ve teslimat bilgileriyle ürünleri girersiniz. Sipariş **Yeni → Hazırlanıyor → Yolda → Teslim edildi** sırasıyla ilerler. Yola çıkarırken kurye adı gerekir. Ürün fiyatları sunucudaki menüden alınır; tekrar gönderilen isteğin ikinci bir sipariş açmaması için işlem anahtarı kullanılır. Bu akış henüz gerçek müşteri ve sipariş tablolarına bağlı değildir.
-
-Yönetici **Entegrasyonlar → Gelen sipariş kutusu** bölümünde PlatinMarket veya Entegra adına örnek bir sipariş ekleyebilir. Kaynak ürün kodu menüdeki stok koduyla uyuşursa ürün kendiliğinden eşleşir; uyuşmazsa yönetici ürün seçer. **Paket servise aktar** işlemi aynı gelen siparişi ikinci kez paket siparişine dönüştürmez. Siparişin fiyatı aktarma sırasında sunucudaki aktif menüden alınır. Bu kutu sağlayıcıdan canlı veri almaz; gerçek bağlantı için sağlayıcı sözleşmesi, erişim bilgileri ve doğrulanmış veritabanı şeması gerekir.
-
-### Menü ve mutfak
-
-Yönetici menü ekranında kategori ve ürün ekleyebilir, adları ve fiyatları düzenleyebilir, porsiyon tanımlayabilir ve ürünü müşteri menüsünden kaldırmak için pasifleştirebilir. Ürün değişiklikleri yeni siparişleri etkiler; mevcut adisyon satırlarının kaydedilmiş fiyatını geriye dönük değiştirmez.
-
-Mutfak bildirimlerinde yazdırma denemesi kuyrukta görünür. Tarayıcının yazdırma penceresi açıldıktan sonra mutfak personeli **Yazdırıldı** veya **Yazdırılamadı** sonucunu kaydeder. Hatalı kayıt tekrar denenebilir; başarılı sonuçtan sonra bildirim görüldü olarak işaretlenebilir. Tarayıcı gerçek kâğıt çıktısını doğrulayamadığı için bu adım personel onayına dayanır.
-
-### Kim hangi ekrana girer?
-
-| Rol | Erişim |
-| --- | --- |
-| Yönetici (`admin`) | Genel bakış, masalar, paket servis, mutfak, menü ve ürün yönetimi, raporlar, adisyon geçmişi, stok ve maliyet, personel, ayarlar, gelen sipariş kutusu ve rezervasyonlar. Ödeme, düzeltme, iade, paket tahsilatı ve masa taşıma gibi işlemler bu roldedir. |
-| Garson (`garson`) | Masalar, sipariş ve paket servis akışı, menü. |
-| Mutfak (`mutfak`) | Mutfak fişleri ve menü. |
-| Müşteri | Giriş yapmadan `/menu` adresindeki salt okunur menü. |
-
-İşlem izinleri sunucuda ayrı denetlenir: garson sipariş ve gerekçeli iptal yapar; zayi, ikram ve ödeme yöneticiye; ürün hazırlığı ve mutfak bildirimleri mutfak personeli ile yöneticiye açıktır. Personel ekranları telefonda ve masaüstünde açılır. Açık ve koyu tema bulunur. Sunucu, değişikliklerden sonra SignalR üzerinden personel ekranlarına yenileme sinyali gönderir.
-
-## Yerelde çalıştırma
-
-Gerekenler: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). Depodaki derlenmiş arayüz `wwwroot` altında bulunduğu için yalnızca uygulamayı açacaksanız Node.js gerekmez.
-
-Windows'ta [AtiaBaslat.bat](AtiaBaslat.bat) dosyasına çift tıklayın. Dosya sunucuyu başlatır ve hazır olduğunda giriş sayfasını tarayıcıda açar. Sunucu komut penceresi açık kaldığı sürece çalışır.
-
-Depo kökünde:
+Komut satırından başlatmak isterseniz depo kökünde:
 
 ```powershell
 dotnet run --environment Development --urls "http://0.0.0.0:5080"
 ```
 
-Sunucu bilgisayarında personel girişi için `http://127.0.0.1:5080/login` adresini açın. Diğer bilgisayarlarda `127.0.0.1` yerine sunucunun yerel ağ IP adresini yazın: `http://SUNUCU-IP:5080/login`. Müşteri menüsü aynı adreste `/menu`, API ise `/api` altında çalışır. Windows Güvenlik Duvarı bağlantıyı engelliyorsa 5080 portuna izin verin.
+| Adres | Ne açılır |
+| --- | --- |
+| `/login` | Personel girişi |
+| `/menu` | Müşteri menüsü (giriş gerekmez, salt okunur) |
+| `/api` | Sunucu API'si |
 
 ### Demo hesapları
 
-Bu hesaplar yalnızca `Development` ortamındaki demo modunda kullanılabilir. Üç hesabın parolası da `demo123`.
-
-| Rol | Kullanıcı adı | Parola |
+| Rol | Kullanıcı adı | Şifre |
 | --- | --- | --- |
 | Yönetici | `admin` | `demo123` |
 | Garson | `garson` | `demo123` |
 | Mutfak | `mutfak` | `demo123` |
 
-Demo sunucuya erişebilen diğer bilgisayarlardan da açılır. Üç hesabın giriş bilgileri bu depoda açıkça yer aldığı için erişimi ağ düzeyinde kısıtlamadan gerçek işletme verisiyle kullanmayın. İmzalı oturum belirtecindeki rol sunucuda doğrulanır; istek gövdesindeki rol veya personel alanı yetki vermez. Yeni personel hesapları **Personel** ekranından açılır. Demo kayıtları `App_Data/demo-state.json` dosyasında kalır; başlangıç verisine dönmek için **Ayarlar → Genel → Başlangıç verisine dön** düğmesini kullanın ya da sunucu kapalıyken bu dosyayı silin. Dosyayı kapatmak için `Demo__StatePath` ortam değişkenini boş verin. Mağaza numarası `Restaurant__StoreId` ile ayarlanır (varsayılan 1); oturum yalnızca kendi mağazasının sunucusunda geçerlidir.
+Bu şifreler depoda açıkça yazılı. Sunucuyu dış ağa açmayın ve gerçek işletme verisi girmeyin. Yeni personel hesapları uygulama içindeki **Personel** ekranından açılır.
+
+---
+
+## Neler yapılabiliyor?
+
+### 🍽️ Masa ve adisyon
+- Masaları bölüme ve duruma göre (dolu, boş, rezerve) bulma.
+- Ürün seçici masa ekranının üzerinde açılır. Kategori, arama, adet ve porsiyon seçilir; seçim onaylandıktan sonra panel açık kalır.
+- Ürün seçenekleri ve ekstralar: pişirme derecesi, ekstra malzeme, menü içeriği. Zorunlu veya isteğe bağlı olabilir; ek fiyat varsa kendiliğinden eklenir.
+- Hazır notlar ("Soğansız", "Az pişmiş" gibi) tek dokunuşla eklenir. Ürün barkod okutarak da eklenebilir.
+- Kişi sayısı, ikram, gerekçeli iptal ve zayi.
+- Masa taşıma, ayırma ve birleştirme.
+- Müşteriye bilgi fişi yazdırma. Fişte KDV dökümü ve adisyon barkodu bulunur; barkod okutulunca adisyon açılır.
+
+### 💳 Ödeme
+- Nakit, banka kartı, yemek kartı (türüyle birlikte), cari ve indirim.
+- Tam ödeme, kısmi ödeme, **kişi sayısına eşit bölme** ve **ürün seçerek ödeme**. Ödenmiş ürün iptal edilemez.
+- Hugin S1 / PayGo için işlem akışı simülasyonu.
+- **Adisyonlar** ekranında kapanmış adisyonlar incelenir. Ödeme şekli aynı işletme günü içinde düzeltilebilir; sonrası için iade kaydı tutulur. Fiş yeniden yazdırılabilir.
+
+### 👨‍🍳 Mutfak
+- Bekleyen siparişler, ürün bazında "hazır" işaretleme, 15 dakikayı aşan siparişler.
+- Ürünler kategorisine göre istasyona yönlendirilir (örneğin içecekler bara). Mutfak ekranı istasyona göre süzülebilir.
+- Yazdırma kuyruğu tutulur; çıktının alındığını personel onaylar.
+
+### 🛵 Paket servis
+- Telefon yazılınca müşteri kartı ve kayıtlı adresler gelir. Kart ilk siparişte kendiliğinden oluşur.
+- Sipariş şu sırayla ilerler: **Yeni → Hazırlanıyor → Yolda → Teslim edildi**. Kurye tanımlı listeden seçilir.
+- Yönetici tahsilatı doğrular. Nakit paket tutarı bu doğrulamayla beklenen kasa nakdine girer.
+- **Gelen sipariş kutusu:** PlatinMarket veya Entegra adına örnek sipariş elle girilir, ürün eşlenir ve paket servise aktarılır. Aynı sipariş iki kez aktarılmaz.
+
+### 📊 Raporlar
+- **Günlük:** masa ve paket satışı, ödeme türleri, saatlik satış, iptal, zayi, ikram ve iade, KDV dağılımı, yemek kartı dağılımı (tahmini komisyonla), kurye hesabı, kasa mutabakatı ve vardiya kapanışı.
+- **Dönem / ay sonu:** gün gün toplamlar; en fazla 62 gün.
+- **Personel:** açılan adisyon, satış, iptal, ikram, tahsilat ve iade.
+
+### 📦 Stok ve maliyet
+- Hammadde, reçete ve porsiyon çarpanı tanımlanır (örneğin yarım porsiyon için 0,6).
+- Satılan ürünün malzemesi reçeteye göre stoktan düşer. İptal edilen ürünün malzemesi geri eklenir, zayide eklenmez. Stok bitse de satış engellenmez; uyarı gösterilir.
+- Giriş, çıkış ve sayım hareketleri. Birim maliyet alışlarla ağırlıklı ortalama olarak güncellenir. Ürün bazında maliyet oranı görülür.
+
+### ⚙️ Yönetim
+- **Menü:** kategori, ürün, fiyat, porsiyon, KDV oranı, barkod, seçenek grupları, satışta olup olmadığı.
+- **Personel:** hesap açma, rol ve şifre değiştirme, pasifleştirme.
+- **Ayarlar:** işletme bilgisi (fişte görünür), masa ve bölüm tanımları, yazıcı ve istasyonlar, yemek kartı türleri, hazır notlar, zayi açma/kapama, demo verisini sıfırlama.
+- **Rezervasyon:** az kullanıldığı için ikincil menüde yer alır.
+
+Açık ve koyu tema vardır. Bir ekranda yapılan değişiklik diğer personel ekranlarına anında yansır (SignalR).
+
+---
+
+## Bir servisin akışı
+
+1. **Garson** masayı seçer, ürünleri ve notları girip onaylar.
+2. **Mutfak** siparişi kendi istasyonunda görür, hazırlar ve "hazır" işaretler.
+3. **Garson veya yönetici** isterse masaya bilgi fişi yazdırır.
+4. **Yönetici** ödemeyi alır; hesap tek seferde, kısmen, eşit bölünerek ya da ürün ürün kapatılabilir.
+5. **Gün sonunda** yönetici günlük raporu inceler, sayılan nakdi girer ve vardiyayı kapatır. Rapor beklenen nakitle farkı gösterir.
+
+İşletme günü varsayılan olarak saat 04.00'te başlar. Böylece gece yarısından sonra kapanan adisyonlar önceki günün raporunda kalır.
+
+---
+
+## Roller ve yetkiler
+
+| | Yönetici | Garson | Mutfak |
+| --- | :---: | :---: | :---: |
+| Masalar, sipariş, gerekçeli iptal | ✅ | ✅ | |
+| Paket servis, müşteri kartı | ✅ | ✅ | |
+| Bilgi fişi yazdırma | ✅ | ✅ | |
+| Mutfak ekranı ve yazdırma kuyruğu | ✅ | | ✅ |
+| Menüyü görme | ✅ | ✅ | ✅ |
+| Ödeme, ikram, zayi, masa taşıma/ayırma/birleştirme | ✅ | | |
+| Ödeme düzeltme, iade, paket tahsilatı | ✅ | | |
+| Raporlar, adisyonlar, stok, personel, ayarlar | ✅ | | |
+
+Yetkiler sunucuda denetlenir; istek içinde gönderilen rol bilgisi yetki vermez. Bir personelin rolü, durumu veya şifresi değişince o hesabın bütün açık oturumları kapanır. Şifreler düz metin olarak değil, tuzlanmış özet (PBKDF2) olarak saklanır.
+
+---
+
+## Ayarlar
+
+Ayarlar `appsettings.json` dosyasından veya ortam değişkenlerinden verilir.
+
+| Ortam değişkeni | Varsayılan | Açıklama |
+| --- | --- | --- |
+| `Demo__StatePath` | `App_Data/demo-state.json` | Demo verisinin saklandığı dosya. Boş verilirse veri yalnız bellekte tutulur. |
+| `Restaurant__StoreId` | `1` | Mağaza numarası. Oturum yalnızca kendi mağazasının sunucusunda geçerlidir. |
+| `Restaurant__BusinessDayStartHour` | `4` | İşletme gününün başladığı saat (0–23). |
+| `JwtSettings__SecretKey` | Geliştirmede rastgele | Oturum imza anahtarı; en az 32 bayt. Geliştirme ortamında her açılışta yenilendiği için sunucu yeniden başlayınca herkes tekrar giriş yapar. |
+
+**Demo verisini sıfırlamak için** **Ayarlar → Genel → Başlangıç verisine dön** düğmesini kullanın ya da sunucu kapalıyken `App_Data/demo-state.json` dosyasını silin. `App_Data` klasörü müşteri ve adisyon bilgisi içerebileceği için depoya gönderilmez.
+
+---
+
+## Geliştirme
+
+### Teknolojiler
+- **Sunucu:** ASP.NET Core 10, JWT oturumu, SignalR.
+- **Arayüz:** React 19, TypeScript, Vite, TanStack Query.
 
 ### Arayüz üzerinde çalışmak
 
-[Node.js](https://nodejs.org/) 20 veya üzeri ile iki terminal kullanın. İlk terminalde yukarıdaki .NET komutu açık kalsın. İkinci terminalde:
+[Node.js](https://nodejs.org/) 20 veya üzeri gerekir. İlk terminalde .NET sunucusu açık kalsın, ikinci terminalde:
 
 ```powershell
 cd ClientApp
@@ -97,49 +160,83 @@ npm ci
 npm run dev
 ```
 
-Vite arayüzü `http://127.0.0.1:5173` adresinde açar ve API ile SignalR isteklerini 5080 portuna iletir. Arayüz değişikliklerini .NET sunucusunun sunduğu sürüme aktarmak için `ClientApp` içinde `npm run build` çalıştırın; çıktı `wwwroot` klasörüne yazılır.
+Vite arayüzü `http://127.0.0.1:5173` adresinde açar; API ve SignalR isteklerini 5080 portuna yönlendirir. Değişiklikleri .NET sunucusunun sunduğu sürüme aktarmak için `npm run build` çalıştırın. Çıktı `wwwroot` klasörüne yazılır ve kaynakla birlikte commit'lenir.
 
-## Kodun düzeni
-
-- `Program.cs`: API rotaları, rol kuralları, oturum açma, SignalR ve statik dosyalar.
-- `Data/RestaurantRepository.cs`: Demo veri ve masa, ödeme, mutfak, paket servis iş kuralları.
-- `Data/RestaurantRepository.*.cs`: Aynı sınıfın parçaları: `State` (demo dosyası), `Staff` (personel ve şifre), `Setup` (işletme, masa/bölüm, yazıcı, yemek kartı), `Billing` (seçenekler, KDV, ürün bazında ödeme, düzeltme, iade), `Delivery` (müşteri, kurye, tahsilat), `Reports` (dönem ve personel), `Stock` (reçete ve stok).
-- `Endpoints/OperationsEndpoints.cs`: Bu parçaların API rotaları; rol kuralları `Program.cs` ile aynıdır.
-- `Models/`: API istekleri ve veri modelleri.
-- `ClientApp/src/`: React ekranları, oturum yönetimi ve arayüz stilleri.
-- `Tests/`: API sözleşmesi ve iş kuralı testleri.
-- `wwwroot/`: Derlenmiş arayüz; .NET uygulaması bu dosyaları sunar.
-
-Sunucu ASP.NET Core 10, arayüz React 19, TypeScript ve Vite ile yazıldı. TanStack Query veri isteklerini, SignalR değişiklik bildirimlerini yönetir. Personel oturumu JWT kullanır. Demo verileri bellekte tutulur; `Data/DbContext.cs` içindeki SQL sınırı doğrulanmış bir canlı bağlantı değildir.
-
-## Testler
-
-Depo kökünde API testleri:
+### Testler
 
 ```powershell
+# API testleri (depo kökünde)
 dotnet test Tests/AtiaRestorant.API.Tests.csproj
-```
 
-`ClientApp` içinde arayüz testleri ve üretim derlemesi:
-
-```powershell
+# Arayüz testleri ve üretim derlemesi (TypeScript denetimi dahil)
 cd ClientApp
-npm ci
 npm test
 npm run build
 ```
 
-11 Kasım 2026 kontrolünde 53 API ve 24 arayüz testi geçti; TypeScript denetimi ve üretim derlemesi de tamamlandı. Yeni testler seçenek fiyatlarını, ürün bazında ödemeyi, ödeme düzeltme ve iadenin rapora etkisini, demo dosyasının yeniden yüklenmesini, personel oturumunun kapanmasını, stok düşümünü ve paket tahsilatını kapsıyor. Testler menü ve gelen sipariş yetkilerini, fiyatın sunucuda belirlenmesini, mükerrer kayıt korumasını, paket raporunu ve yazdırma kuyruğunun durum geçişlerini kapsıyor. [Önceki doğrulama notu](VERIFICATION.md) 6 Kasım tarihli bir anlık kayıttır, bu yüzden oradaki test sayıları daha düşüktür.
+### Kodun düzeni
 
-## Canlı kullanımdan önce
+```text
+Program.cs                      API rotaları, rol kuralları, oturum, SignalR
+Endpoints/OperationsEndpoints.cs  Personel, ayar, adisyon geçmişi, paket, rapor ve stok rotaları
+Services/AuthService.cs         Giriş ve oturum belirteci
+Data/
+  RestaurantRepository.cs       Masa, sipariş, ödeme, mutfak, paket servis kuralları
+  RestaurantRepository.State.cs     Demo dosyasına kaydetme ve geri yükleme
+  RestaurantRepository.Staff.cs     Personel hesapları ve şifreler
+  RestaurantRepository.Setup.cs     İşletme, masa/bölüm, yazıcı, yemek kartı, hazır not
+  RestaurantRepository.Billing.cs   Seçenekler, KDV, ürün bazında ödeme, düzeltme, iade
+  RestaurantRepository.Delivery.cs  Müşteri kartı, kurye, tahsilat
+  RestaurantRepository.Reports.cs   Dönem ve personel raporları
+  RestaurantRepository.Stock.cs     Hammadde, reçete, stok hareketi, maliyet
+  DbContext.cs                  Doğrulanmamış ERP bağlantısı için kapalı sınır
+Models/                         API istek ve yanıt modelleri
+ClientApp/src/                  React ekranları ve stiller
+Tests/                          API sözleşme ve iş kuralı testleri
+wwwroot/                        Derlenmiş arayüz
+```
 
-`Demo:Enabled=false` ayarı gerçek veritabanını açmaz. SQL şeması henüz doğrulanmadığı için API, sağlık kontrolü dışındaki isteklerde 503 yanıtı verir. Demo modu da geliştirme ortamı dışında başlatılmaz. Bu sürümü mağazada canlı tahsilat veya sipariş kaydı için kullanmayın.
+Yeni sunucu işleri mümkün olduğunca ayrı `RestaurantRepository.<Konu>.cs` dosyalarına konur. Böylece iki kişinin aynı dosyada çakışması azalır.
 
-Geçiş için şu bilgilere ihtiyaç var:
+---
 
-1. Masa, adisyon, sipariş satırı, ödeme, ürün, müşteri, paket servis ve mağaza ayarlarının gerçek veritabanı şeması; mümkünse kişisel verisi ayıklanmış örnek kayıtlar.
-2. Hangi mağazanın PlatinMarket, Entegra, Hugin/PayGo, e-Adisyon veya arayan numara donanımını kullandığı.
-3. Kullanılan sağlayıcıların güncel API belgeleri ve test erişimleri. Erişim bilgileri depoya yazılmamalı.
-4. Masaüstü uygulamasıyla web aynı veriyi kullanacaksa eşzamanlı işlem, mükerrer sipariş ve mükerrer tahsilat kuralları.
+## Ekip çalışması
 
-Önce canlı veri eşlemesi ve mağaza bazlı yetki sınırları kurulmalı. Ardından paket servis ve gerçekten kullanılan sipariş kaynakları bağlanabilir. Fiziksel POS, yazıcı ve arayan numara donanımı ayrı bağlantı çalışmaları gerektirir. Ayrıntılı sıra ve masaüstü kodundaki karşılıklar [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) bulunuyor.
+Proje iki kişi tarafından sırayla, farklı bilgisayarlarda ve yapay zekâ ajanlarıyla geliştiriliyor. Kurallar **[AGENTS.md](AGENTS.md)** dosyasındadır; Claude Code (`CLAUDE.md`) ve GitHub Copilot (`.github/copilot-instructions.md`) aynı dosyaya yönlendirilir. Özetle:
+
+- İşe başlamadan ve push etmeden önce `origin/main` getirilir. Alınmamış commit varken düzenleme, commit veya push yapılmaz.
+- Diğer kişinin değişiklikleri bilinçli iştir; geri alınmaz, üzerine yazılmaz.
+- `AGENTS.md` içindeki **Korunan davranışlar** listesi, kullanıcı açıkça istemedikçe değiştirilmez.
+- Yalnız ilgili dosyalar commit'lenir. Commit mesajları Türkçe karakterlerle yazılır.
+- `main` dalına yalnız normal (hızlı ileri) push yapılır; force push yasaktır.
+
+---
+
+## Sınırlar ve canlıya geçiş
+
+**Şu an olmayanlar:**
+- Gerçek ERP veritabanı bağlantısı. `Demo:Enabled=false` verilirse sağlık kontrolü dışındaki bütün istekler 503 yanıtı alır.
+- Fiziksel POS (Hugin, PayGo) bağlantısı ve kart iadesi. İadeler yalnız kayıt olarak tutulur.
+- PlatinMarket, Entegra, e-Adisyon ve arayan numara cihazından otomatik veri alma.
+- Kâğıt çıktının doğrulanması; yazdırma tarayıcının yazdırma penceresiyle yapılır.
+- Mali belge. Yazdırılan fiş bilgi fişidir.
+
+**Canlıya geçmeden önce gerekenler:**
+1. Masa, adisyon, ödeme, ürün, müşteri, paket ve mağaza ayarlarının gerçek veritabanı şeması; mümkünse kişisel verisi ayıklanmış örnek kayıtlar.
+2. Hangi mağazanın hangi sağlayıcıyı ve cihazı kullandığı (PlatinMarket, Entegra, Hugin/PayGo, e-Adisyon, arayan numara).
+3. Sağlayıcıların güncel API belgeleri ve test erişimleri. Erişim bilgileri depoya yazılmaz.
+4. Masaüstü ve web aynı veriyi kullanacaksa eşzamanlı işlem, mükerrer sipariş ve mükerrer tahsilat kuralları.
+
+Önerilen sıra ve masaüstü kodundaki karşılıklar [geçiş analizinde](MASAUSTU_GECIS_ANALIZI.md) anlatılıyor.
+
+---
+
+## Diğer belgeler
+
+| Belge | İçerik |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Ekip ve yapay zekâ ajanları için çalışma kuralları |
+| [MASAUSTU_GECIS_ANALIZI.md](MASAUSTU_GECIS_ANALIZI.md) | Masaüstünden web'e taşıma kararları |
+| [PRODUCT.md](PRODUCT.md) · [DESIGN.md](DESIGN.md) | Ürün amacı ve tasarım ilkeleri |
+| [docs/](docs/) | API belgesi, eski iş akışları, POS notları, doğrulama kayıtları |
+| [VERIFICATION.md](VERIFICATION.md) | 6 Kasım tarihli eski doğrulama notu |
