@@ -1,8 +1,3 @@
-> ### Batuhan'dan Not
->
-> Test için böyle bir şey denedim veritabanı vs zaten olmadığı için öylesine denemelik birşeyler yaptırdım 6.11.2026 // 22.08
-> PlatinMarket, Entegra, POS gibi canlı bağlantılar için veritabanı şeması ile ilgili sağlayıcı erişimleri gerekiyor.
-
 # ATIA Restoran Web
 
 Birden fazla bilgisayarda veya kod ajanıyla çalışırken önce [depo çalışma kurallarını](AGENTS.md) okuyun. Değişikliğe başlamadan ve GitHub'a göndermeden hemen önce uzak `main` dalını kontrol edin; yeni commit'leri kendi işinizle birleştirin. Claude Code ve GitHub Copilot için aynı kurallara yönlendiren talimat dosyaları da depodadır.
