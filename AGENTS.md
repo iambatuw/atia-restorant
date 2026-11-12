@@ -65,6 +65,7 @@ Aşağıdakiler bilinçli kararlardır ve çalışır durumdadır. Kullanıcı a
 - Hızlı satış masasızdır, tek adımda ödenir ve mutfakta hazır olana kadar görünür.
 - QR menü masa başına rastgele kodla açılır; misafir yalnız o masa için garson veya hesap ister. Bu istekler oturumsuzdur ve adres başına dakikada 6 ile sınırlıdır.
 - Ürün görseli yalnız JPEG/PNG/WEBP ve en fazla 2 MB; dosya imzası sunucuda denetlenir. Görseller ve günlük yedekler `App_Data` altındadır.
+- Entegrasyonlar ekranındaki PlatinMarket/Entegra "Gelen sipariş kutusu" kullanıcı isteğiyle kaldırıldı (arayüz, API ve testler). Kullanıcı açıkça istemedikçe geri eklenmez.
 - Ekranlar: Raporlar (günlük, dönem, personel), Adisyonlar, Kasa ve cari, Hızlı satış, Stok ve maliyet, Personel, Ayarlar (işletme, masa/bölüm, QR menü, yazıcı, yemek kartı, hazır not, demo sıfırlama).
 
 ## Doğrulama ve gönderme

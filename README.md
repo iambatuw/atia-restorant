@@ -81,7 +81,6 @@ Bu şifreler depoda açıkça yazılı. Sunucuyu dış ağa açmayın ve gerçek
 - Telefon yazılınca müşteri kartı ve kayıtlı adresler gelir. Kart ilk siparişte kendiliğinden oluşur.
 - Sipariş şu sırayla ilerler: **Yeni → Hazırlanıyor → Yolda → Teslim edildi**. Kurye tanımlı listeden seçilir.
 - Yönetici tahsilatı doğrular. Nakit paket tutarı bu doğrulamayla beklenen kasa nakdine girer.
-- **Gelen sipariş kutusu:** PlatinMarket veya Entegra adına örnek sipariş elle girilir, ürün eşlenir ve paket servise aktarılır. Aynı sipariş iki kez aktarılmaz.
 
 ### 🧾 Hızlı satış
 - Masa açmadan tezgâhtan veya gel-al satış: ürünler seçilir, ödeme alınır, sipariş mutfağa düşer.
@@ -241,13 +240,13 @@ Proje iki kişi tarafından sırayla, farklı bilgisayarlarda ve yapay zekâ aja
 - Gerçek ERP veritabanı bağlantısı. `Demo:Enabled=false` verilirse sağlık kontrolü dışındaki bütün istekler 503 yanıtı alır.
 - Fiziksel POS (Hugin, PayGo) bağlantısı ve kart iadesi. İadeler yalnız kayıt olarak tutulur.
 - QR menüden sipariş verme. Misafir yalnız menüyü görür ve çağrı gönderir.
-- PlatinMarket, Entegra, e-Adisyon ve arayan numara cihazından otomatik veri alma.
+- e-Adisyon ve arayan numara cihazından otomatik veri alma.
 - Kâğıt çıktının doğrulanması; yazdırma tarayıcının yazdırma penceresiyle yapılır.
 - Mali belge. Yazdırılan fiş bilgi fişidir.
 
 **Canlıya geçmeden önce gerekenler:**
 1. Masa, adisyon, ödeme, ürün, müşteri, paket ve mağaza ayarlarının gerçek veritabanı şeması; mümkünse kişisel verisi ayıklanmış örnek kayıtlar.
-2. Hangi mağazanın hangi sağlayıcıyı ve cihazı kullandığı (PlatinMarket, Entegra, Hugin/PayGo, e-Adisyon, arayan numara).
+2. Hangi mağazanın hangi sağlayıcıyı ve cihazı kullandığı (Hugin/PayGo, e-Adisyon, arayan numara).
 3. Sağlayıcıların güncel API belgeleri ve test erişimleri. Erişim bilgileri depoya yazılmaz.
 4. Masaüstü ve web aynı veriyi kullanacaksa eşzamanlı işlem, mükerrer sipariş ve mükerrer tahsilat kuralları.
 

@@ -36,11 +36,10 @@ public sealed partial class RestaurantRepository
     private readonly Dictionary<string, string> _posIdempotency = [];
     private readonly List<IslemKaydiDTO> _audit = [];
     private readonly List<MutfakBildirimDTO> _kitchenEvents = [];
-    private readonly List<GelenSiparisDTO> _incomingOrders = [];
     private readonly Dictionary<DateOnly, VardiyaKapanisDTO> _shiftClosings = [];
     private readonly HashSet<long> _mergedReceipts = [];
     private bool _wasteEnabled;
-    private long _nextAudit, _nextKitchenEvent, _nextIncomingOrder, _nextProduct = 11, _nextCategory = 4;
+    private long _nextAudit, _nextKitchenEvent, _nextProduct = 11, _nextCategory = 4;
     private int _nextPortion = 1000;
     private readonly int _businessDayStartHour;
     private long _nextReceipt = 1000, _nextLine = 10000, _nextReservation = 100, _nextDelivery = 3000;
@@ -341,73 +340,6 @@ public sealed partial class RestaurantRepository
         }
         Log(actor, "Paket durumu değişti", $"#{delivery.KayitNo}: {request.Durum}{(request.Durum == PaketDurum.Yolda ? $", kurye {courier.Name}" : "")}");
         return delivery;
-    });
-    public List<GelenSiparisDTO> IncomingOrders(StaffActor actor) => Read(() =>
-    {
-        Staff(actor, "Admin");
-        return _incomingOrders.OrderByDescending(o => o.KayitNo).ToList();
-    });
-    public GelenSiparisDTO StageIncomingOrder(GelenSiparisEkleRequest request, StaffActor actor) => Change(() =>
-    {
-        Staff(actor, "Admin");
-        Require(request.Kaynak is "PlatinMarket" or "Entegra", "Kaynak geçersiz.");
-        Require(!string.IsNullOrWhiteSpace(request.HariciSiparisNo) && request.HariciSiparisNo.Trim().Length <= 80,
-            "Sağlayıcı sipariş numarası 1–80 karakter olmalı.");
-        Require(!string.IsNullOrWhiteSpace(request.KaynakUrunKodu) && request.KaynakUrunKodu.Trim().Length <= 80,
-            "Ürün kodu 1–80 karakter olmalı.");
-        Require(request.Miktar is >= 1 and <= 50, "Miktar 1–50 olmalı.");
-        Require(!string.IsNullOrWhiteSpace(request.MusteriAdi) && request.MusteriAdi.Trim().Length <= 100,
-            "Müşteri adı 1–100 karakter olmalı.");
-        Require(!string.IsNullOrWhiteSpace(request.Telefon) && request.Telefon.Trim().Length <= 30,
-            "Telefon 1–30 karakter olmalı.");
-        Require(!string.IsNullOrWhiteSpace(request.Adres) && request.Adres.Trim().Length <= 300,
-            "Adres 1–300 karakter olmalı.");
-        Require(request.OdemeSekli is "Nakit" or "Kart" or "Online", "Ödeme şekli geçersiz.");
-        var existing = _incomingOrders.FirstOrDefault(o => o.Kaynak == request.Kaynak &&
-            string.Equals(o.HariciSiparisNo, request.HariciSiparisNo.Trim(), StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
-        {
-            Require(existing.KaynakUrunKodu == request.KaynakUrunKodu.Trim() && existing.Miktar == request.Miktar &&
-                existing.MusteriAdi == request.MusteriAdi.Trim() && existing.Telefon == request.Telefon.Trim() &&
-                existing.Adres == request.Adres.Trim() && existing.OdemeSekli == request.OdemeSekli,
-                "Aynı sağlayıcı sipariş numarası farklı içerikle geldi.", 409);
-            return existing;
-        }
-        var product = _menu.SelectMany(c => c.Urunler).FirstOrDefault(p => p.Aktif &&
-            string.Equals(p.StokKodu, request.KaynakUrunKodu.Trim(), StringComparison.OrdinalIgnoreCase));
-        var incoming = new GelenSiparisDTO { KayitNo = ++_nextIncomingOrder, Kaynak = request.Kaynak,
-            HariciSiparisNo = request.HariciSiparisNo.Trim(), KaynakUrunKodu = request.KaynakUrunKodu.Trim(),
-            EslesenStokKayitNo = product?.KayitNo, Miktar = request.Miktar, MusteriAdi = request.MusteriAdi.Trim(),
-            Telefon = request.Telefon.Trim(), Adres = request.Adres.Trim(), OdemeSekli = request.OdemeSekli, Tarih = Now };
-        _incomingOrders.Add(incoming);
-        Log(actor, "Entegrasyon siparişi alındı", $"{incoming.Kaynak} #{incoming.HariciSiparisNo}");
-        return incoming;
-    });
-    public GelenSiparisDTO MapIncomingOrder(long id, GelenSiparisEslemeRequest request, StaffActor actor) => Change(() =>
-    {
-        Staff(actor, "Admin");
-        var incoming = _incomingOrders.FirstOrDefault(o => o.KayitNo == id)
-            ?? throw new ApiException(404, "Gelen sipariş bulunamadı.");
-        Require(incoming.PaketSiparisNo is null, "Aktarılmış sipariş değiştirilemez.", 409);
-        Require(_menu.SelectMany(c => c.Urunler).Any(p => p.KayitNo == request.StokKayitNo && p.Aktif),
-            "Aktif ürün bulunamadı.", 404);
-        incoming.EslesenStokKayitNo = request.StokKayitNo;
-        return incoming;
-    });
-    public GelenSiparisDTO TransferIncomingOrder(long id, StaffActor actor) => Change(() =>
-    {
-        Staff(actor, "Admin");
-        var incoming = _incomingOrders.FirstOrDefault(o => o.KayitNo == id)
-            ?? throw new ApiException(404, "Gelen sipariş bulunamadı.");
-        if (incoming.PaketSiparisNo.HasValue) return incoming;
-        var productId = incoming.EslesenStokKayitNo ?? throw new ApiException(409, "Önce ürünü eşleştirin.");
-        var delivery = CreateDelivery(new PaketSiparisEkleRequest { IdempotencyKey = Guid.NewGuid().ToString(),
-            MusteriAdi = incoming.MusteriAdi, Telefon = incoming.Telefon, Adres = incoming.Adres,
-            OdemeSekli = incoming.OdemeSekli,
-            Satirlar = [new PaketSiparisSatirIstek { StokKayitNo = productId, Miktar = incoming.Miktar }] }, actor);
-        incoming.PaketSiparisNo = delivery.KayitNo;
-        Log(actor, "Entegrasyon siparişi aktarıldı", $"{incoming.Kaynak} #{incoming.HariciSiparisNo} → paket #{delivery.KayitNo}");
-        return incoming;
     });
     public AdisyonBaslikDTO? Receipt(long tableId) => Read(() => { Table(tableId); return Open(tableId); });
 

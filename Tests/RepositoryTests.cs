@@ -200,27 +200,6 @@ public sealed class RepositoryTests
     }
 
     [Fact]
-    public void IncomingOrderNeedsMappingAndTransfersOnlyOnce()
-    {
-        var repository = Repository();
-        var request = new GelenSiparisEkleRequest { Kaynak = "PlatinMarket", HariciSiparisNo = "PM-100",
-            KaynakUrunKodu = "BILINMIYOR", Miktar = 2, MusteriAdi = "Ayşe", Telefon = "05550000000",
-            Adres = "Merkez Mahallesi", OdemeSekli = "Nakit" };
-        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.StageIncomingOrder(request, Waiter)).Status);
-        var staged = repository.StageIncomingOrder(request, Admin);
-        Assert.Null(staged.EslesenStokKayitNo);
-        Assert.Equal(staged.KayitNo, repository.StageIncomingOrder(request, Admin).KayitNo);
-        Assert.Single(repository.IncomingOrders(Admin));
-        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.TransferIncomingOrder(staged.KayitNo, Admin)).Status);
-        repository.MapIncomingOrder(staged.KayitNo, new() { StokKayitNo = 4 }, Admin);
-        var transferred = repository.TransferIncomingOrder(staged.KayitNo, Admin);
-        Assert.Equal(transferred.PaketSiparisNo, repository.TransferIncomingOrder(staged.KayitNo, Admin).PaketSiparisNo);
-        Assert.Single(repository.Deliveries(Admin));
-        request.Miktar = 3;
-        Assert.Equal(409, Assert.Throws<ApiException>(() => repository.StageIncomingOrder(request, Admin)).Status);
-    }
-
-    [Fact]
     public void KitchenPrintQueueTracksFailureRetryAndManualConfirmation()
     {
         var repository = Repository();

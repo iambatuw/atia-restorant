@@ -70,10 +70,6 @@ Empty-table adisyon returns `Data: null`. Failed requests return non-2xx RFC Pro
 | GET | `/api/paket-siparisler` | Garson/Admin; delivery orders |
 | POST | `/api/paket-siparisler` | Garson/Admin; create delivery order |
 | PATCH | `/api/paket-siparisler/{id}/durum` | Garson/Admin; advance delivery status |
-| GET | `/api/entegrasyonlar/gelen` | Admin; staged incoming orders |
-| POST | `/api/entegrasyonlar/gelen` | Admin; manually stage one demo order line |
-| PUT | `/api/entegrasyonlar/gelen/{id}/eslestir` | Admin; map source SKU to menu product |
-| POST | `/api/entegrasyonlar/gelen/{id}/aktar` | Admin; create delivery order once |
 | GET | `/api/mutfak` | Mutfak/Admin; `MutfakSiparisDTO[]` |
 | GET | `/api/mutfak/bildirimler` | Mutfak/Admin; pending kitchen notices |
 | POST | `/api/mutfak/bildirimler/{id}/yazdir` | Mutfak/Admin; register print attempt |
@@ -100,7 +96,6 @@ Admin login body is `{ "KullaniciAdi":"admin", "Sifre":"demo123" }`. Its Data is
 - KDS `HazirMiktar` is stored independently from printing. `KalanMiktar=max(0,Miktar-HazirMiktar)` and `Hazir=KalanMiktar<=0`. A ticket appears whenever any row is unready; ticket contains all its rows. Mark-ready acknowledges only quantities present inside that locked operation. Later added/increased quantities return a ticket. Reducing clamps ready quantity to the reduced count, so subsequent increases cannot resurrect readiness. **No operation updates YazdirilanMiktar**; print-related legacy fields are informational only.
 - Kitchen notice print state starts `Bekliyor`. A print attempt sets `KontrolBekliyor`; staff records `Tamamlandi` or `Hatali` through the result endpoint. Only a confirmed result can be acknowledged; failed attempts can be retried. The browser cannot verify paper output. These statuses are process-local demo records, separate from legacy `YazdirilanMiktar`.
 - Admin menu writes validate category, product, price and portion input. Public `/api/menu` lists active products only. New orders use current active menu prices; existing order-line prices remain unchanged. Changes disappear on restart.
-- The incoming-order inbox accepts only `PlatinMarket` and `Entegra` source labels. It is a manual, single-line demo staging endpoint, not a provider webhook. Source plus external order ID is unique. Conflicting retries return 409. Source SKU can match a menu `StokKodu` or be mapped by Admin. Transfer creates one delivery order, prices it from the active menu, and returns the same order on retry. No provider request is made.
 - Report `ToplamAdisyon`, hourly totals and bestsellers include only closed receipts on the Istanbul local closing date. `ToplamCiro` and hourly ciro are net of receipt discount; product row totals are gross before receipt-level discount. `AcikAdisyon` separately counts open receipts created on the queried Istanbul local date. Payment subtotals reconcile to net table ciro. `PaketCiro` includes deliveries completed on the queried business date; `GenelSatis` adds that amount to table ciro. Package payment method is recorded but no settlement is verified, so package sales are excluded from table cash reconciliation.
 - Reservations require an existing unmerged table, nonblank customer <=100 characters, 1–20 people, optional phone <=30 characters with digits/spaces/+/-/parentheses, and future time within a year. A table's reservations must be at least two hours apart; a reservation within two hours is rejected if occupied. Reservations within ±2 hours of now flag a table reserved. Delete removes the reservation. This simple fixed window is a demo policy, not a real scheduling/capacity model.
 

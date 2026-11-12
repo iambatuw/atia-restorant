@@ -368,37 +368,6 @@ public class PaketSiparisDTO
     public string? TahsilEden { get; set; }
 }
 
-public class GelenSiparisDTO
-{
-    public long KayitNo { get; set; }
-    public string Kaynak { get; set; } = "";
-    public string HariciSiparisNo { get; set; } = "";
-    public string KaynakUrunKodu { get; set; } = "";
-    public long? EslesenStokKayitNo { get; set; }
-    public int Miktar { get; set; }
-    public string MusteriAdi { get; set; } = "";
-    public string Telefon { get; set; } = "";
-    public string Adres { get; set; } = "";
-    public string OdemeSekli { get; set; } = "Nakit";
-    public DateTime Tarih { get; set; }
-    public long? PaketSiparisNo { get; set; }
-}
-public class GelenSiparisEkleRequest
-{
-    public string Kaynak { get; set; } = "";
-    public string HariciSiparisNo { get; set; } = "";
-    public string KaynakUrunKodu { get; set; } = "";
-    public int Miktar { get; set; }
-    public string MusteriAdi { get; set; } = "";
-    public string Telefon { get; set; } = "";
-    public string Adres { get; set; } = "";
-    public string OdemeSekli { get; set; } = "Nakit";
-}
-public class GelenSiparisEslemeRequest
-{
-    public long StokKayitNo { get; set; }
-}
-
 public class PaketSiparisSatirIstek
 {
     public long StokKayitNo { get; set; }

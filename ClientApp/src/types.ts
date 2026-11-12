@@ -39,7 +39,6 @@ export interface Reservation {KayitNo:number;MasaKayitNo:number;MasaAdi:string;M
 export type DeliveryStatus=0|1|2|3|4;
 export interface DeliveryLine {StokKayitNo:number;StokAdi:string;PorsiyonKayitNo:number|null;PorsiyonAdi:string|null;Miktar:number;BirimFiyat:number;SatirTutari:number;SecimMetni?:string|null}
 export interface DeliveryOrder {KayitNo:number;KayitTarihi:string;MusteriAdi:string;Telefon:string;Adres:string;Aciklama:string|null;OdemeSekli:string;Kurye:string|null;Durum:DeliveryStatus;GenelToplam:number;Satirlar:DeliveryLine[];MusteriKayitNo?:number|null;KuryeKayitNo?:number|null;TahsilEdildi?:boolean;TahsilatTarihi?:string|null;TahsilEden?:string|null}
-export interface IncomingOrder {KayitNo:number;Kaynak:'PlatinMarket'|'Entegra';HariciSiparisNo:string;KaynakUrunKodu:string;EslesenStokKayitNo:number|null;Miktar:number;MusteriAdi:string;Telefon:string;Adres:string;OdemeSekli:'Nakit'|'Kart'|'Online';Tarih:string;PaketSiparisNo:number|null}
 
 // ───── POS CİHAZ ENTEGRASYONU ─────
 export type PosCihazTipi = 0 | 1 | 2; // 0=HariciManuelPos, 1=HuginS1, 2=PayGo

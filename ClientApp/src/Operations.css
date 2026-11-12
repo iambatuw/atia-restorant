@@ -341,22 +341,7 @@
 .op-portion-row button{min-height:44px}
 .op-package-report{margin-bottom:22px}
 .op-package-report p{margin:14px 20px 18px;color:var(--op-muted);font-size:12px;line-height:1.5}
-.op-inbox{margin:0 0 28px}
-.op-inbox-note{max-width:72ch;margin:0 20px 18px;color:var(--op-muted);font-size:13px;line-height:1.55}
-.op-inbox-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:0 20px 20px}
-.op-inbox-form label{display:grid;gap:5px;color:var(--op-muted);font-size:12px}
-.op-inbox-form input,.op-inbox-form select,.op-inbox-row-actions select{width:100%;min-height:44px;padding:0 11px;border:1px solid var(--op-line);border-radius:7px;background:var(--op-paper);color:var(--op-ink);font:inherit}
-.op-inbox-form button{align-self:end;min-height:44px}
-.op-inbox-list{padding:0 20px 8px}
-.op-inbox-list article{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0;border-top:1px solid var(--op-line)}
-.op-inbox-list article>div:first-child{display:grid;gap:5px}
-.op-inbox-list article strong{font-size:14px}
-.op-inbox-list article span,.op-inbox-list article small{color:var(--op-muted);font-size:12px}
-.op-inbox-row-actions{display:flex;align-items:center;gap:8px}
-.op-inbox-row-actions select{min-width:170px}
-.op-inbox-row-actions button{min-height:44px;white-space:nowrap}
-@media(max-width:1000px){.op-inbox-form{grid-template-columns:repeat(2,minmax(0,1fr))}.op-inbox-list article{align-items:stretch;flex-direction:column}}
-@media(max-width:620px){.op-inbox-form{grid-template-columns:1fr}.op-inbox-row-actions{align-items:stretch;flex-direction:column}.op-inbox-row-actions select{min-width:0}.op-portion-row{grid-template-columns:1fr!important}.op-kitchen-events li{align-items:stretch}.op-kitchen-events li button{margin-left:0}}
+@media(max-width:620px){.op-portion-row{grid-template-columns:1fr!important}.op-kitchen-events li{align-items:stretch}.op-kitchen-events li button{margin-left:0}}
 
 /* Touch controls shared by the staff screens. */
 .op-app button { min-height: 44px; }

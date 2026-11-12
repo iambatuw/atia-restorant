@@ -175,17 +175,6 @@ api.MapPatch("/paket-siparisler/{id:long}/durum", (long id, PaketDurumRequest re
     RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
     Mutate(() => repository.UpdateDelivery(id, request, Actor(user)), hub, logs))
     .RequireAuthorization("Orders");
-api.MapGet("/entegrasyonlar/gelen", (ClaimsPrincipal user, RestaurantRepository repository) =>
-    Results.Ok(ApiResult<List<GelenSiparisDTO>>.Ok(repository.IncomingOrders(Actor(user))))).RequireAuthorization("Admin");
-api.MapPost("/entegrasyonlar/gelen", (GelenSiparisEkleRequest request, ClaimsPrincipal user,
-    RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
-    Mutate(() => repository.StageIncomingOrder(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
-api.MapPut("/entegrasyonlar/gelen/{id:long}/eslestir", (long id, GelenSiparisEslemeRequest request,
-    ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
-    Mutate(() => repository.MapIncomingOrder(id, request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
-api.MapPost("/entegrasyonlar/gelen/{id:long}/aktar", (long id, ClaimsPrincipal user, RestaurantRepository repository,
-    IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
-    Mutate(() => repository.TransferIncomingOrder(id, Actor(user)), hub, logs)).RequireAuthorization("Admin");
 api.MapGet("/bolumler", (RestaurantRepository repository) => Results.Ok(ApiResult<List<RestorantBolumDTO>>.Ok(repository.Sections())));
 api.MapGet("/masalar", (long? bolumId, RestaurantRepository repository) =>
     Results.Ok(ApiResult<List<RestorantMasaDTO>>.Ok(repository.Tables(bolumId))));
