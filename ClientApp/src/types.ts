@@ -114,7 +114,8 @@ export interface MasaBirlestirRequest {
 export interface StoreProfile {MagazaKayitNo:number;MagazaKodu:string;Unvan:string;Adres:string|null;Telefon:string|null;VergiDairesi:string|null;VergiNo:string|null;FisAltYazisi:string|null}
 export interface Printer {KayitNo:number;Ad:string;Kategoriler:number[]}
 export interface MealCard {KayitNo:number;Ad:string;KomisyonOrani:number;Aktif:boolean}
-export interface FullSettings extends RestaurantSettings {Isletme:StoreProfile;HazirNotlar:string[];Yazicilar:Printer[];YemekKartlari:MealCard[]}
+export interface QuickNoteDefinition {Ad:string;Grup:string}
+export interface FullSettings extends RestaurantSettings {Isletme:StoreProfile;HazirNotlar:string[];HazirNotTanimlari?:QuickNoteDefinition[];Yazicilar:Printer[];YemekKartlari:MealCard[]}
 export interface DemoStatus {Kalici:boolean;SonKayit:string|null;SonHata:string|null}
 export interface StaffAccount {KayitNo:number;KullaniciAdi:string;AdSoyad:string;Rol:Role;Aktif:boolean;OlusturmaTarihi:string;SonGiris:string|null}
 

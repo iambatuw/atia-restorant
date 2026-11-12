@@ -28,6 +28,8 @@ public static class OperationsEndpoints
             Mutate(() => repository.SaveStoreProfile(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
         api.MapPut("/ayarlar/hazir-notlar", (HazirNotlarRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
             Mutate(() => repository.SaveQuickNotes(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+        api.MapPost("/ayarlar/hazir-notlar", (HazirNotEkleRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.AddQuickNote(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
         api.MapPut("/ayarlar/yazicilar", (YazicilarRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
             Mutate(() => repository.SavePrinters(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
         api.MapPut("/ayarlar/yemek-kartlari", (YemekKartlariRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>

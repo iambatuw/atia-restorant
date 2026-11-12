@@ -7,6 +7,7 @@ public sealed partial class RestaurantRepository
 {
     private IsletmeBilgisiDTO _isletme = new();
     private List<string> _quickNotes = [];
+    private Dictionary<string, string> _quickNoteGroups = [];
     private List<YaziciDTO> _printers = [];
     private List<YemekKartiDTO> _mealCards = [];
     private List<BolumTanimi> _sections = [];
@@ -27,6 +28,8 @@ public sealed partial class RestaurantRepository
     private RestoranAyarlariDTO SettingsView() => new()
     {
         ZayiAktif = _wasteEnabled, Isletme = _isletme, HazirNotlar = _quickNotes,
+        HazirNotTanimlari = _quickNotes.Select(note => new HazirNotTanimiDTO
+            { Ad = note, Grup = _quickNoteGroups.GetValueOrDefault(note, "Genel") }).ToList(),
         Yazicilar = _printers, YemekKartlari = _mealCards
     };
 
@@ -50,13 +53,29 @@ public sealed partial class RestaurantRepository
         Staff(actor, "Admin");
         var notes = (request.Notlar ?? throw new ApiException(400, "Not listesi geçersiz."))
             .Select(note => Mandatory(note, 40, "Hazır not")).ToList();
-        Require(notes.Count <= 30, "En fazla 30 hazır not tanımlanabilir.");
+        Require(notes.Count <= 100, "En fazla 100 hazır not tanımlanabilir.");
         Require(notes.Distinct(StringComparer.OrdinalIgnoreCase).Count() == notes.Count, "Hazır notlar birbirinden farklı olmalı.");
+        _quickNoteGroups = notes.ToDictionary(note => note, note => _quickNoteGroups
+            .FirstOrDefault(entry => string.Equals(entry.Key, note, StringComparison.OrdinalIgnoreCase)).Value ?? "Genel");
         _quickNotes = notes;
         foreach (var product in _menu.SelectMany(category => category.Urunler))
             product.HazirNotlar = (product.HazirNotlar ?? []).Where(note => notes.Contains(note, StringComparer.OrdinalIgnoreCase)).ToList();
         Log(actor, "Hazır notlar güncellendi", $"{notes.Count} not");
         return _quickNotes;
+    });
+
+    public RestoranAyarlariDTO AddQuickNote(HazirNotEkleRequest request, StaffActor actor) => Change(() =>
+    {
+        Staff(actor, "Admin");
+        var name = Mandatory(request.Ad, 40, "Hazır not");
+        var group = Mandatory(request.Grup, 30, "Not grubu");
+        Require(_quickNotes.Count < 100, "En fazla 100 hazır not tanımlanabilir.");
+        Require(!_quickNotes.Contains(name, StringComparer.OrdinalIgnoreCase), "Bu hazır not zaten tanımlı.", 409);
+        group = _quickNoteGroups.Values.FirstOrDefault(existing => string.Equals(existing, group, StringComparison.OrdinalIgnoreCase)) ?? group;
+        _quickNotes.Add(name);
+        _quickNoteGroups[name] = group;
+        Log(actor, "Hazır not eklendi", $"{group}: {name}");
+        return SettingsView();
     });
 
     public List<YaziciDTO> SavePrinters(YazicilarRequest request, StaffActor actor) => Change(() =>
@@ -191,6 +210,12 @@ public sealed partial class RestaurantRepository
         _isletme = new IsletmeBilgisiDTO { MagazaKayitNo = _cfgStoreId, MagazaKodu = $"M{_cfgStoreId:000}", Unvan = "ATIA Demo Restoran",
             Adres = "Demo adresi", FisAltYazisi = "Bizi tercih ettiğiniz için teşekkür ederiz." };
         _quickNotes = ["Soğansız", "Az pişmiş", "İyi pişmiş", "Acısız", "Az tuzlu", "Sossuz", "Ayrı tabakta", "Paket yapılacak"];
+        _quickNoteGroups = new()
+        {
+            ["Soğansız"] = "Malzeme", ["Az pişmiş"] = "Pişirme", ["İyi pişmiş"] = "Pişirme",
+            ["Acısız"] = "Lezzet", ["Az tuzlu"] = "Lezzet", ["Sossuz"] = "Malzeme",
+            ["Ayrı tabakta"] = "Servis", ["Paket yapılacak"] = "Servis"
+        };
         _sections = [new() { KayitNo = 1, BolumKodu = "SALON", BolumAdi = "Salon", SiraNo = 0 },
             new() { KayitNo = 2, BolumKodu = "BAHCE", BolumAdi = "Bahçe", SiraNo = 1 }];
         _nextSection = 2;

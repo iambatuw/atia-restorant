@@ -33,6 +33,15 @@
 .op-chip[aria-pressed="true"] { border-color: var(--op-accent); background: var(--op-accent-soft); color: var(--op-accent); font-weight: 700; }
 .op-chip small { margin-left: 5px; color: var(--op-muted); font-size: 11px; }
 .op-quick-note-options label { min-height: 44px; padding: 7px 12px; border: 1px solid var(--op-line); border-radius: 8px; cursor: pointer; }
+.op-product-quick-notes { display: grid; gap: 10px; }
+.op-product-quick-notes p { margin: 0; }
+.op-quick-note-filters { display: grid; grid-template-columns: minmax(0,2fr) minmax(140px,1fr); gap: 10px; }
+.op-quick-note-list { display: grid; gap: 12px; max-height: 240px; overflow-y: auto; padding: 10px; border: 1px solid var(--op-line); border-radius: 8px; }
+.op-quick-note-group { display: grid; gap: 7px; }
+.op-quick-note-group > strong { font-size: 13px; }
+.op-quick-note-create { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--op-line); border-radius: 8px; }
+.op-quick-note-create > button { min-height: 44px; justify-self: start; }
+@media (max-width: 620px) { .op-quick-note-filters { grid-template-columns: 1fr; } .op-quick-note-create > button { justify-self: stretch; } }
 
 .op-option-panel { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--op-accent); border-radius: 9px; background: var(--op-paper); }
 .op-option-panel > header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }

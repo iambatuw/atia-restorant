@@ -169,11 +169,11 @@ function QuickNotes({notes}:{notes:string[]}){
   const [draft,setDraft]=useState(notes);
   const [next,setNext]=useState('');
   const save=useSave<{Notlar:string[]}>('/ayarlar/hazir-notlar');
-  const add=()=>{const value=next.trim();if(value&&!draft.some(n=>n.toLocaleLowerCase('tr')===value.toLocaleLowerCase('tr'))&&draft.length<30){setDraft(d=>[...d,value]);setNext('');}};
+  const add=()=>{const value=next.trim();if(value&&!draft.some(n=>n.toLocaleLowerCase('tr')===value.toLocaleLowerCase('tr'))&&draft.length<100){setDraft(d=>[...d,value]);setNext('');}};
   return <form className="op-form-card" onSubmit={e=>{e.preventDefault();save.mutate({Notlar:draft});}}>
-    <h2>Hazır sipariş notları</h2><p>Garson ürün seçerken bu notlara dokunarak ekler; yazmaya gerek kalmaz. En fazla 30 not, her biri 40 karakter.</p>
+    <h2>Hazır sipariş notları</h2><p>Garson ürün seçerken bu notlara dokunarak ekler; yazmaya gerek kalmaz. En fazla 100 not, her biri 40 karakter.</p>
     <div className="op-chip-row" style={{marginBottom:12}}>{draft.map(note=><button type="button" key={note} className="op-chip" aria-label={`${note} notunu kaldır`} onClick={()=>setDraft(d=>d.filter(n=>n!==note))}>{note} <small>✕</small></button>)}</div>
-    <div className="op-toolbar-row"><label className="op-grow">Yeni not<input maxLength={40} value={next} onChange={e=>setNext(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();add();}}}/></label><button type="button" className="secondary" onClick={add} disabled={!next.trim()}><Plus size={15}/> Ekle</button></div>
+    <div className="op-toolbar-row"><label className="op-grow">Yeni not<input maxLength={40} value={next} onChange={e=>setNext(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();add();}}}/></label><button type="button" className="secondary" onClick={add} disabled={!next.trim()||draft.length>=100}><Plus size={15}/> Ekle</button></div>
     <ErrorBox error={save.error}/>
     <div className="dialog-actions"><button className="primary" disabled={save.isPending}>{save.isPending?'Kaydediliyor…':save.isSuccess?'Kaydedildi':'Kaydet'}</button></div>
   </form>;

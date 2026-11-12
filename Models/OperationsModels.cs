@@ -28,6 +28,18 @@ public class HazirNotlarRequest
     public List<string> Notlar { get; set; } = [];
 }
 
+public class HazirNotTanimiDTO
+{
+    public string Ad { get; set; } = "";
+    public string Grup { get; set; } = "Genel";
+}
+
+public class HazirNotEkleRequest
+{
+    public string Ad { get; set; } = "";
+    public string Grup { get; set; } = "Genel";
+}
+
 public class YaziciDTO
 {
     public long KayitNo { get; set; }

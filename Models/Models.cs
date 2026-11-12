@@ -119,6 +119,7 @@ public class RestoranAyarlariDTO
     public bool ZayiAktif { get; set; }
     public IsletmeBilgisiDTO Isletme { get; set; } = new();
     public List<string> HazirNotlar { get; set; } = new();
+    public List<HazirNotTanimiDTO> HazirNotTanimlari { get; set; } = new();
     public List<YaziciDTO> Yazicilar { get; set; } = new();
     public List<YemekKartiDTO> YemekKartlari { get; set; } = new();
 }

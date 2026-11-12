@@ -138,6 +138,40 @@ public sealed class OperationsTests
     }
 
     [Fact]
+    public void NewQuickNoteCanBeReusedAcrossProductsAfterRestart()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"atia-notes-{Guid.NewGuid():N}.json");
+        try
+        {
+            var first = Repository(path);
+            Assert.Equal(403, Assert.Throws<ApiException>(() => first.AddQuickNote(
+                new() { Ad = "Turşusuz", Grup = "Malzeme" }, Waiter)).Status);
+            var settings = first.AddQuickNote(new() { Ad = "Turşusuz", Grup = "Malzeme" }, Admin);
+            Assert.Contains(settings.HazirNotTanimlari, note => note.Ad == "Turşusuz" && note.Grup == "Malzeme");
+            Assert.Equal(409, Assert.Throws<ApiException>(() => first.AddQuickNote(
+                new() { Ad = "turşusuz", Grup = "Servis" }, Admin)).Status);
+
+            var second = Repository(path);
+            Assert.Contains(second.Settings().HazirNotTanimlari, note => note.Ad == "Turşusuz" && note.Grup == "Malzeme");
+            var category = second.Menu().Single(item => item.GrupAdi == "Başlangıçlar");
+            var created = second.SaveProduct(null, new() { GrupKayitNo = category.KayitNo, StokAdi = "Çiğ köfte",
+                SatisFiyati = 150m, HazirNotlar = ["Turşusuz"] }, Admin);
+            var salad = second.Menu().SelectMany(item => item.Urunler).Single(item => item.StokAdi == "Çoban Salata");
+            second.SaveProduct(salad.KayitNo, new() { GrupKayitNo = salad.GrupKayitNo!.Value,
+                StokAdi = salad.StokAdi!, SatisFiyati = salad.SatisFiyati, KdvOrani = salad.KdvOrani,
+                Porsiyonlar = salad.Porsiyonlar, HazirNotlar = [.. salad.HazirNotlar!, "Turşusuz"] }, Admin);
+
+            var third = Repository(path);
+            Assert.Contains("Turşusuz", third.Menu().SelectMany(item => item.Urunler)
+                .Single(item => item.KayitNo == created.KayitNo).HazirNotlar!);
+            Assert.Contains("Turşusuz", third.Menu().SelectMany(item => item.Urunler)
+                .Single(item => item.KayitNo == salad.KayitNo).HazirNotlar!);
+            Assert.Contains(third.Settings().HazirNotTanimlari, note => note.Ad == "Turşusuz" && note.Grup == "Malzeme");
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     public void StaffAccountsProtectAdminsAndInvalidateChangedSessions()
     {
         var repository = Repository();
