@@ -61,7 +61,11 @@ Aşağıdakiler bilinçli kararlardır ve çalışır durumdadır. Kullanıcı a
 - Ödeme: tam, kısmi, eşit bölme ve ürün seçerek ödeme. Ödenmiş ürün iptal edilemez. Ödeme şekli yalnız aynı işletme günü düzeltilir; sonrası iade kaydıyla yapılır.
 - Paket servis: telefonla müşteri kartı, tanımlı kurye, yönetici tahsilat doğrulaması. Nakit paket tahsilatı beklenen kasa nakdine girer.
 - Stok reçeteye göre satışta düşer; iptal geri ekler, zayi eklemez; satış stok yüzünden engellenmez.
-- Ekranlar: Raporlar (günlük, dönem, personel), Adisyonlar, Stok ve maliyet, Personel, Ayarlar (işletme, masa/bölüm, yazıcı, yemek kartı, hazır not, demo sıfırlama).
+- Cari hesap: cari ödeme hesaba borç yazar, kredi limiti aşılamaz; düzeltme ve iade bakiyeyi düzeltir; cari tahsilatı ve kasa giriş/çıkışı beklenen kasa nakdine girer.
+- Hızlı satış masasızdır, tek adımda ödenir ve mutfakta hazır olana kadar görünür.
+- QR menü masa başına rastgele kodla açılır; misafir yalnız o masa için garson veya hesap ister. Bu istekler oturumsuzdur ve adres başına dakikada 6 ile sınırlıdır.
+- Ürün görseli yalnız JPEG/PNG/WEBP ve en fazla 2 MB; dosya imzası sunucuda denetlenir. Görseller ve günlük yedekler `App_Data` altındadır.
+- Ekranlar: Raporlar (günlük, dönem, personel), Adisyonlar, Kasa ve cari, Hızlı satış, Stok ve maliyet, Personel, Ayarlar (işletme, masa/bölüm, QR menü, yazıcı, yemek kartı, hazır not, demo sıfırlama).
 
 ## Doğrulama ve gönderme
 

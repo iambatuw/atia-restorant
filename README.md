@@ -66,6 +66,8 @@ Bu şifreler depoda açıkça yazılı. Sunucuyu dış ağa açmayın ve gerçek
 ### 💳 Ödeme
 - Nakit, banka kartı, yemek kartı (türüyle birlikte), cari ve indirim.
 - Tam ödeme, kısmi ödeme, **kişi sayısına eşit bölme** ve **ürün seçerek ödeme**. Ödenmiş ürün iptal edilemez.
+- **Cari (veresiye):** cari ödeme seçilen müşterinin hesabına borç yazılır; kredi limiti aşılamaz.
+- Adisyona **fatura bilgisi** (unvan, vergi dairesi, vergi no, adres) eklenir ve fişte görünür.
 - Hugin S1 / PayGo için işlem akışı simülasyonu.
 - **Adisyonlar** ekranında kapanmış adisyonlar incelenir. Ödeme şekli aynı işletme günü içinde düzeltilebilir; sonrası için iade kaydı tutulur. Fiş yeniden yazdırılabilir.
 
@@ -73,6 +75,7 @@ Bu şifreler depoda açıkça yazılı. Sunucuyu dış ağa açmayın ve gerçek
 - Bekleyen siparişler, ürün bazında "hazır" işaretleme, 15 dakikayı aşan siparişler.
 - Ürünler kategorisine göre istasyona yönlendirilir (örneğin içecekler bara). Mutfak ekranı istasyona göre süzülebilir.
 - Yazdırma kuyruğu tutulur; çıktının alındığını personel onaylar.
+- Yeni sipariş gelince **sesli uyarı** çalar (cihaz başına açılıp kapatılabilir).
 
 ### 🛵 Paket servis
 - Telefon yazılınca müşteri kartı ve kayıtlı adresler gelir. Kart ilk siparişte kendiliğinden oluşur.
@@ -80,10 +83,25 @@ Bu şifreler depoda açıkça yazılı. Sunucuyu dış ağa açmayın ve gerçek
 - Yönetici tahsilatı doğrular. Nakit paket tutarı bu doğrulamayla beklenen kasa nakdine girer.
 - **Gelen sipariş kutusu:** PlatinMarket veya Entegra adına örnek sipariş elle girilir, ürün eşlenir ve paket servise aktarılır. Aynı sipariş iki kez aktarılmaz.
 
+### 🧾 Hızlı satış
+- Masa açmadan tezgâhtan veya gel-al satış: ürünler seçilir, ödeme alınır, sipariş mutfağa düşer.
+- Barkod okutarak ürün eklenebilir; nakit, kart, yemek kartı veya cari ile ödenir.
+
+### 💰 Kasa ve cari
+- **Kasa hareketi:** kasaya giriş (açılış, bozuk para) ve çıkış (masraf, tedarikçi, bankaya yatırılan, avans).
+- **Cari hesaplar:** unvan, vergi bilgisi, kredi limiti, bakiye; ekstre ve tahsilat. Nakit tahsilat kasaya girer.
+- Beklenen kasa nakdi = masa nakdi + paket nakdi + cari nakit tahsilatı + kasa girişi − kasa çıkışı.
+
+### 📱 QR menü ve garson çağırma
+- Her masaya ayrı QR kodu (**Ayarlar → QR menü**); hepsi tek seferde yazdırılabilir, kaybolan kod yenilenir.
+- Misafir kodu okutunca o masanın menüsü açılır; **Garson çağır** veya **Hesap iste** der. Personel ekranında sesli uyarıyla görünür.
+- Menüde ürün görseli, açıklama ve 14 alerjen bilgisi gösterilir.
+
 ### 📊 Raporlar
 - **Günlük:** masa ve paket satışı, ödeme türleri, saatlik satış, iptal, zayi, ikram ve iade, KDV dağılımı, yemek kartı dağılımı (tahmini komisyonla), kurye hesabı, kasa mutabakatı ve vardiya kapanışı.
 - **Dönem / ay sonu:** gün gün toplamlar; en fazla 62 gün.
 - **Personel:** açılan adisyon, satış, iptal, ikram, tahsilat ve iade.
+- Dönem, personel, adisyon listesi, stok, kasa ve cari ekstre **CSV** (Excel) olarak indirilebilir.
 
 ### 📦 Stok ve maliyet
 - Hammadde, reçete ve porsiyon çarpanı tanımlanır (örneğin yarım porsiyon için 0,6).
@@ -123,6 +141,8 @@ Açık ve koyu tema vardır. Bir ekranda yapılan değişiklik diğer personel e
 | Menüyü görme | ✅ | ✅ | ✅ |
 | Ödeme, ikram, zayi, masa taşıma/ayırma/birleştirme | ✅ | | |
 | Ödeme düzeltme, iade, paket tahsilatı | ✅ | | |
+| Hızlı satış, kasa hareketi, cari hesap ve tahsilat | ✅ | | |
+| Fatura bilgisi yazma, misafir çağrılarını kapatma | ✅ | ✅ | |
 | Raporlar, adisyonlar, stok, personel, ayarlar | ✅ | | |
 
 Yetkiler sunucuda denetlenir; istek içinde gönderilen rol bilgisi yetki vermez. Bir personelin rolü, durumu veya şifresi değişince o hesabın bütün açık oturumları kapanır. Şifreler düz metin olarak değil, tuzlanmış özet (PBKDF2) olarak saklanır.
@@ -140,7 +160,7 @@ Ayarlar `appsettings.json` dosyasından veya ortam değişkenlerinden verilir.
 | `Restaurant__BusinessDayStartHour` | `4` | İşletme gününün başladığı saat (0–23). |
 | `JwtSettings__SecretKey` | Geliştirmede rastgele | Oturum imza anahtarı; en az 32 bayt. Geliştirme ortamında her açılışta yenilendiği için sunucu yeniden başlayınca herkes tekrar giriş yapar. |
 
-**Demo verisini sıfırlamak için** **Ayarlar → Genel → Başlangıç verisine dön** düğmesini kullanın ya da sunucu kapalıyken `App_Data/demo-state.json` dosyasını silin. `App_Data` klasörü müşteri ve adisyon bilgisi içerebileceği için depoya gönderilmez.
+**Demo verisini sıfırlamak için** **Ayarlar → Genel → Başlangıç verisine dön** düğmesini kullanın ya da sunucu kapalıyken `App_Data/demo-state.json` dosyasını silin. `App_Data` klasörü müşteri ve adisyon bilgisi içerebileceği için depoya gönderilmez. Aynı klasörde ürün görselleri (`gorseller/`) ve son 14 işletme gününün günlük yedekleri (`yedekler/`) tutulur; bir yedeğe dönmek için sunucu kapalıyken yedek dosyayı `demo-state.json` adıyla kopyalayın.
 
 ---
 
@@ -189,6 +209,9 @@ Data/
   RestaurantRepository.Delivery.cs  Müşteri kartı, kurye, tahsilat
   RestaurantRepository.Reports.cs   Dönem ve personel raporları
   RestaurantRepository.Stock.cs     Hammadde, reçete, stok hareketi, maliyet
+  RestaurantRepository.Accounts.cs  Cari hesap, kasa hareketi, fatura bilgisi
+  RestaurantRepository.QuickSale.cs Hızlı (masasız) satış
+  RestaurantRepository.Guest.cs     Masa QR kodları, misafir çağrıları, ürün görseli ve alerjen
   DbContext.cs                  Doğrulanmamış ERP bağlantısı için kapalı sınır
 Models/                         API istek ve yanıt modelleri
 ClientApp/src/                  React ekranları ve stiller
@@ -217,6 +240,7 @@ Proje iki kişi tarafından sırayla, farklı bilgisayarlarda ve yapay zekâ aja
 **Şu an olmayanlar:**
 - Gerçek ERP veritabanı bağlantısı. `Demo:Enabled=false` verilirse sağlık kontrolü dışındaki bütün istekler 503 yanıtı alır.
 - Fiziksel POS (Hugin, PayGo) bağlantısı ve kart iadesi. İadeler yalnız kayıt olarak tutulur.
+- QR menüden sipariş verme. Misafir yalnız menüyü görür ve çağrı gönderir.
 - PlatinMarket, Entegra, e-Adisyon ve arayan numara cihazından otomatik veri alma.
 - Kâğıt çıktının doğrulanması; yazdırma tarayıcının yazdırma penceresiyle yapılır.
 - Mali belge. Yazdırılan fiş bilgi fişidir.
