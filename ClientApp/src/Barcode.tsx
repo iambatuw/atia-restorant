@@ -53,6 +53,7 @@ export function BillPrint({receipt,store,onDone}:{receipt:Receipt;store?:StorePr
     {store?.Telefon&&<p className="center">Tel: {store.Telefon}</p>}
     {(store?.VergiDairesi||store?.VergiNo)&&<p className="center">{[store?.VergiDairesi,store?.VergiNo].filter(Boolean).join(' · ')}</p>}
     <hr/>
+    {receipt.FaturaBilgisi&&<><p>Müşteri: {receipt.FaturaBilgisi.Unvan}</p>{(receipt.FaturaBilgisi.VergiDairesi||receipt.FaturaBilgisi.VergiNo)&&<p>{[receipt.FaturaBilgisi.VergiDairesi,receipt.FaturaBilgisi.VergiNo].filter(Boolean).join(' · ')}</p>}{receipt.FaturaBilgisi.Adres&&<p>{receipt.FaturaBilgisi.Adres}</p>}<hr/></>}
     <p>{receipt.MasaAdi} · Adisyon #{receipt.KayitNo}</p>
     <p>{new Date().toLocaleString('tr-TR')} · {receipt.KisiSayisi} kişi</p>
     <table><tbody>{receipt.Detaylar.map(line=><tr key={line.KayitNo}>

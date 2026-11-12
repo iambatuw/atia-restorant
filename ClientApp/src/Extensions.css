@@ -102,3 +102,45 @@
   .op-option-editor-head { grid-template-columns: 1fr; }
   .op-lookup input { width: 110px; }
 }
+
+/* Kasa/cari, hızlı satış, QR menü, misafir çağrıları, ürün görseli */
+.op-quick-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,380px); gap: 20px; align-items: start; }
+.op-quick-search { width: 100%; }
+.op-quick-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; }
+.op-quick-product { display: grid; gap: 6px; min-height: 104px; padding: 14px; border: 1px solid var(--op-line); border-radius: 9px; background: var(--op-paper); color: var(--op-ink); text-align: left; }
+.op-quick-product span { color: var(--op-muted); font-size: 11px; }
+.op-quick-product strong { font-size: 15px; }
+.op-quick-product b { align-self: end; font-variant-numeric: tabular-nums; }
+.op-quick-product:hover { border-color: var(--op-accent); }
+.op-quick-cart { position: sticky; top: 16px; }
+.op-quick-lines { max-height: 40vh; overflow-y: auto; padding: 0 16px; }
+.op-quick-pay { display: grid; gap: 10px; padding: 16px; border-top: 1px solid var(--op-line); }
+.op-quick-pay label { display: grid; gap: 4px; color: var(--op-muted); font-size: 12px; }
+.op-quick-pay input, .op-quick-pay select { min-height: 44px; }
+.op-call-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; padding: 10px 14px; border: 1px solid var(--op-warning); border-radius: 9px; background: color-mix(in srgb, var(--op-warning) 10%, var(--op-paper)); color: var(--op-ink); }
+.op-call { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.op-call small { color: var(--op-muted); }
+.op-call button { min-height: 36px; }
+.op-qr-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(190px,1fr)); gap: 12px; }
+.op-qr-card { display: grid; justify-items: center; gap: 8px; margin: 0; padding: 14px; border: 1px solid var(--op-line); border-radius: 9px; background: #fff; color: #111; }
+.op-qr-card figcaption { display: grid; justify-items: center; font-size: 13px; }
+.op-qr-card figcaption span { color: #555; font-size: 11px; }
+.op-guest-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 auto 16px; max-width: 1100px; padding: 14px 16px; border: 1px solid var(--line, #ddd); border-radius: 10px; }
+.op-guest-bar > div:first-child { display: grid; }
+.op-guest-bar > div:first-child span { font-size: 12px; opacity: .75; }
+.op-guest-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.op-guest-bar p { flex-basis: 100%; margin: 0; font-size: 13px; }
+.op-image-editor { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.op-image-editor img, .op-image-empty { width: 88px; height: 88px; border-radius: 8px; object-fit: cover; }
+.op-image-empty { display: grid; place-items: center; border: 1px dashed var(--op-line); color: var(--op-muted); font-size: 11px; }
+.op-file-button { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; cursor: pointer; }
+.op-file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.op-menu-photo { width: 72px; height: 72px; flex: none; border-radius: 8px; object-fit: cover; }
+.op-menu-desc { margin: 4px 0 0; font-size: 12px; opacity: .8; }
+.op-menu-allergen { display: block; margin-top: 4px; font-size: 11px; opacity: .75; }
+@media print {
+  .qr-print, .qr-print * { visibility: visible; }
+  .qr-print { position: absolute; inset: 0; grid-template-columns: repeat(3, 1fr); background: #fff; }
+  .op-no-print { display: none; }
+}
+@media (max-width: 900px) { .op-quick-layout { grid-template-columns: 1fr; } .op-quick-cart { position: static; } }

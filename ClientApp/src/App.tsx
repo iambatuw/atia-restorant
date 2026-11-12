@@ -18,13 +18,16 @@ import {
   Settings2,
   ReceiptText,
   Boxes,
-  UsersRound
+  UsersRound,
+  Landmark,
+  ShoppingBag
 } from 'lucide-react';
 import type {Health,Session} from './types';
 import {api,ApiError,setToken} from './api';
 import {clearSessionToken,readSessionToken,saveSessionToken} from './session';
 import {Empty,Loading,ThemeToggle} from './ui';
 import {LoginPage} from './LoginPage';
+import {GuestCallsBar,GuestTableBar} from './GuestFeatures';
 import {Tables} from './Tables';
 import {MenuPage} from './MenuPage';
 import {Kitchen} from './Kitchen';
@@ -40,9 +43,12 @@ const Management=lazy(()=>import('./Management'));
 const ReceiptsPage=lazy(()=>import('./ReceiptsPage'));
 const StockPage=lazy(()=>import('./StockPage'));
 const StaffPage=lazy(()=>import('./StaffPage'));
+const CashPage=lazy(()=>import('./CashPage'));
+const QuickSalePage=lazy(()=>import('./QuickSalePage'));
 export default function App(){
   const [path,setPath]=useState(()=>location.pathname);
   const publicMenu=path.replace(/\/$/,'')==='/menu';
+  const [guestCode]=useState(()=>{const code=new URLSearchParams(location.search).get('masa');return code&&/^[0-9a-f]{16}$/.test(code)?code:null;});
   const navigate=useCallback((next:string,replace=false)=>{
     if(location.pathname!==next) window.history[replace?'replaceState':'pushState'](null,'',next);
     setPath(next);
@@ -132,6 +138,7 @@ export default function App(){
           </div>
         </header>
 
+        {guestCode&&<GuestTableBar code={guestCode}/>}
         <MenuPage publicView/>
       </div>
     );
@@ -163,10 +170,12 @@ export default function App(){
     {id:'genel-bakis',label:'Genel bakış',icon:LayoutDashboard,allowed:session.Rol==='Admin'},
     {id:'masalar',label:'Masalar',icon:Armchair,allowed:session.Rol!=='Mutfak'},
     {id:'paket-servis',label:'Paket servis',icon:Truck,allowed:session.Rol!=='Mutfak'},
+    {id:'hizli-satis',label:'Hızlı satış',icon:ShoppingBag,allowed:session.Rol==='Admin'},
     {id:'mutfak',label:'Mutfak',icon:ChefHat,allowed:session.Rol!=='Garson'},
     {id:'menu',label:'Menü',icon:BookOpen,allowed:true},
     {id:'raporlar',label:'Raporlar',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
     {id:'adisyonlar',label:'Adisyonlar',icon:ReceiptText,allowed:session.Rol==='Admin'},
+    {id:'kasa',label:'Kasa ve cari',icon:Landmark,allowed:session.Rol==='Admin'},
     {id:'stok',label:'Stok ve maliyet',icon:Boxes,allowed:session.Rol==='Admin'},
     {id:'personel',label:'Personel',icon:UsersRound,allowed:session.Rol==='Admin'},
     {id:'entegrasyonlar',label:'Entegrasyonlar',icon:PlugZap,allowed:session.Rol==='Admin'},
@@ -235,6 +244,7 @@ export default function App(){
         )}
 
         <main className="op-main" id="ana-icerik">
+          {session.Rol!=='Mutfak'&&<GuestCallsBar/>}
           <Suspense fallback={<Loading/>}>
             {page==='genel-bakis'?(
               <Overview navigate={p=>navigate(pagePath(p))}/>
@@ -252,6 +262,10 @@ export default function App(){
               <SettingsPage/>
             ):page==='adisyonlar'?(
               <ReceiptsPage/>
+            ):page==='kasa'?(
+              <CashPage/>
+            ):page==='hizli-satis'?(
+              <QuickSalePage/>
             ):page==='stok'?(
               <StockPage/>
             ):page==='personel'?(

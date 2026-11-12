@@ -1,6 +1,7 @@
 import type {MasaAyirRequest,MasaAyirSonuc,MasaBirlestirRequest,MasaTasiRequest,OdemeRequest,PosIslemIstek,PosIslemKayit,Receipt,Session} from './types';
 let token = '';
 export function setToken(value:string) {token=value;}
+export function getToken() {return token;}
 export class ApiError extends Error { constructor(message:string, public status:number) {super(message);} }
 export async function api<T>(path:string, options:RequestInit = {}):Promise<T> {
   let response:Response;

@@ -5,7 +5,7 @@ export interface RestaurantSettings {ZayiAktif:boolean}
 export interface Table {MasaId:number;MasaAdi:string;MasaKodu:string;RestorantBolumuKayitNo:number;RestorantBolumAdi:string;BaslikKayitNo:number|null;Tutar:number|null;KisiSayisi:number;AcilisTarihi:string|null;Rezerve:boolean;BirlesmisMasa:boolean;AnaMasa:boolean;Durumu:number}
 export interface Section {KayitNo:number;BolumAdi:string;ToplamMasa:number;DoluMasa:number}
 export interface Portion {KayitNo:number;PorsiyonAdi:string;Fiyat:number;Carpan?:number}
-export interface Product {KayitNo:number;StokAdi:string;SatisFiyati:number;GrupKayitNo:number;GrupAdi:string;Aktif:boolean;Porsiyonlar:Portion[];KdvOrani?:number;Barkod?:string|null;SecenekGruplari?:OptionGroup[];HazirNotlar?:string[];Recete?:RecipeRow[]}
+export interface Product {KayitNo:number;StokAdi:string;SatisFiyati:number;GrupKayitNo:number;GrupAdi:string;Aktif:boolean;Porsiyonlar:Portion[];KdvOrani?:number;Barkod?:string|null;SecenekGruplari?:OptionGroup[];HazirNotlar?:string[];Recete?:RecipeRow[];Aciklama?:string|null;Alerjenler?:string[];GorselSurumu?:number}
 export interface Category {KayitNo:number;GrupAdi:string;Urunler:Product[]}
 export interface OrderLine {KayitNo:number;StokAdi:string;PorsiyonAdi:string|null;Miktar:number;BirimFiyat:number;SatirTutari:number;SatirAciklama:string|null;Ikram:boolean;SecimMetni?:string|null;OdenenMiktar?:number;OdenenTutar?:number}
 export interface Receipt {
@@ -22,6 +22,9 @@ export interface Receipt {
   KisiSayisi:number;
   Detaylar:OrderLine[];
   KdvDokumu?:VatRow[];
+  FaturaBilgisi?:InvoiceDetails|null;
+  CariHesapAdi?:string|null;
+  HizliSatis?:boolean;
   YazdirmaSayisi?:number;
   KayitTarihi?:string|null;
   PersonelAdi?:string|null;
@@ -82,6 +85,7 @@ export interface OdemeRequest {
   PosIslemId?: string | null;
   OdenenSatirlar?: AyrilanSatir[];
   YemekKartiKayitNo?: number | null;
+  CariHesapKayitNo?: number | null;
 }
 
 export interface MasaTasiRequest {
@@ -126,7 +130,7 @@ export interface LineChoice {SecenekKayitNo:number;GrupAdi:string;SecenekAdi:str
 export interface VatRow {Oran:number;Matrah:number;Kdv:number;Toplam:number}
 export interface RefundEntry {KayitNo:number;Tarih:string;Nakit:number;Banka:number;YemekKarti:number;Cari:number;Toplam:number;Gerekce:string;PersonelAdi:string}
 export interface FullOrderLine extends OrderLine {StokKayitNo:number;PorsiyonKayitNo:number|null;KdvOrani:number;Secimler:LineChoice[];PersonelAdi:string|null}
-export interface FullReceipt extends Omit<Receipt,'Detaylar'> {Detaylar:FullOrderLine[];KdvDokumu:VatRow[];Iadeler:RefundEntry[];IadeToplam:number;YazdirmaSayisi:number;YemekKartiKayitNo:number|null;YemekKartiAdi:string|null}
+export interface FullReceipt extends Omit<Receipt,'Detaylar'> {Detaylar:FullOrderLine[];KdvDokumu:VatRow[];Iadeler:RefundEntry[];IadeToplam:number;YazdirmaSayisi:number;YemekKartiKayitNo:number|null;YemekKartiAdi:string|null;CariHesapKayitNo?:number|null;CariHesapAdi?:string|null;FaturaBilgisi?:InvoiceDetails|null;HizliSatis?:boolean}
 export interface ReceiptSummary {KayitNo:number;MasaKayitNo:number|null;MasaAdi:string|null;PersonelAdi:string|null;AcilisTarihi:string|null;KapanisTarihi:string|null;Kapali:boolean;Birlesti:boolean;GenelToplam:number;Indirim:number;Nakit:number;Banka:number;YemekKarti:number;Cari:number;Iade:number;UrunSayisi:number}
 export interface ReceiptHistoryDetail {Adisyon:FullReceipt;KapanisTarihi:string|null;Birlesti:boolean;Duzeltilebilir:boolean;IadeEdilebilir:boolean;Islemler:AuditEntry[]}
 export interface ReceiptLocation {KayitNo:number;MasaKayitNo:number|null;MasaAdi:string|null;Kapali:boolean}
@@ -140,7 +144,7 @@ export interface CourierSummary {KuryeKayitNo:number|null;Kurye:string;TeslimSay
 
 // ───── RAPORLAR ─────
 export interface MealCardSummary {KayitNo:number|null;Ad:string;Tutar:number;TahminiKomisyon:number}
-export interface FullReport extends Omit<Report,'Mutabakat'> {KdvDokumu:VatRow[];YemekKartiDagilimi:MealCardSummary[];PaketTahsilat:DeliveryCollection;KuryeOzeti:CourierSummary[];BeklenenKasaNakdi:number;Mutabakat:Reconciliation&{IadeTutari:number}}
+export interface FullReport extends Omit<Report,'Mutabakat'> {KdvDokumu:VatRow[];YemekKartiDagilimi:MealCardSummary[];PaketTahsilat:DeliveryCollection;KuryeOzeti:CourierSummary[];BeklenenKasaNakdi:number;Mutabakat:Reconciliation&{IadeTutari:number};KasaGiris?:number;KasaCikis?:number;CariTahsilatNakit?:number;CariTahsilatBanka?:number;KasaHareketleri?:CashMovement[]}
 export interface PeriodDay {Tarih:string;AdisyonSayisi:number;MasaSatis:number;PaketSatis:number;Iade:number;ToplamSatis:number;Nakit:number;Banka:number;YemekKarti:number;Cari:number;Indirim:number;Iptal:number;Zayi:number;Ikram:number;VardiyaKapali:boolean}
 export interface PeriodReport {Baslangic:string;Bitis:string;Gunler:PeriodDay[];Toplam:PeriodDay;KdvDokumu:VatRow[];EnCokSatan:{StokAdi:string;ToplamMiktar:number;ToplamTutar:number}[];YemekKartiDagilimi:MealCardSummary[]}
 export interface StaffReportRow {PersonelId:number;PersonelAdi:string;Rol:string|null;AcilanAdisyon:number;UrunAdedi:number;SatisTutari:number;IptalSayisi:number;IptalTutari:number;ZayiTutari:number;IkramTutari:number;TahsilatTutari:number;IadeTutari:number}
@@ -153,3 +157,14 @@ export type StockMovementType=0|1|2|3|4; // Giris, Cikis, Sayim, Satis, SatisIad
 export interface StockMovement {KayitNo:number;Tarih:string;HammaddeKayitNo:number;HammaddeAdi:string;Tip:StockMovementType;Miktar:number;StokSonrasi:number;BirimMaliyet:number|null;Aciklama:string|null;PersonelAdi:string}
 export interface ProductCost {UrunKayitNo:number;UrunAdi:string;PorsiyonAdi:string|null;SatisFiyati:number;ReceteMaliyeti:number;KdvHaricFiyat:number;BrutKar:number;MaliyetOrani:number|null;ReceteVar:boolean}
 
+// ───── CARİ, KASA, HIZLI SATIŞ, QR ─────
+export interface Account {KayitNo:number;Unvan:string;Telefon:string|null;VergiDairesi:string|null;VergiNo:string|null;Adres:string|null;KrediLimiti:number;Aktif:boolean;Bakiye:number}
+export interface AccountMovement {KayitNo:number;CariKayitNo:number;Tarih:string;Tip:string;Borc:number;Alacak:number;BakiyeSonrasi:number;AdisyonNo:number|null;Aciklama:string|null;PersonelAdi:string}
+export interface AccountStatement {Hesap:Account;Hareketler:AccountMovement[]}
+export interface CashMovement {KayitNo:number;Tarih:string;Giris:boolean;Kategori:string;Tutar:number;Aciklama:string;PersonelAdi:string}
+export interface InvoiceDetails {Unvan:string;VergiDairesi:string|null;VergiNo:string|null;Adres:string|null}
+export interface TableQr {MasaKayitNo:number;MasaAdi:string;BolumAdi:string;Kod:string}
+export interface GuestTable {MasaAdi:string;IsletmeAdi:string}
+export type CallType=0|1; // 0=Garson, 1=Hesap
+export interface GuestCall {KayitNo:number;MasaKayitNo:number;MasaAdi:string;Tip:CallType;Tarih:string;Tamamlandi:boolean}
+export const ALLERGENS=['Gluten','Kabuklu deniz ürünleri','Yumurta','Balık','Yer fıstığı','Soya','Süt','Sert kabuklu yemişler','Kereviz','Hardal','Susam','Sülfit','Acı bakla','Yumuşakçalar'] as const;

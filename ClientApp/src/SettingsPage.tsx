@@ -5,8 +5,9 @@ import {api} from './api';
 import type {Category,DemoStatus,FullSettings,MealCard,Printer,Section,StoreProfile,Table} from './types';
 import {ErrorBox,Loading,Modal} from './ui';
 import './Extensions.css';
+import {QrCodesPanel} from './GuestFeatures';
 
-type Tab='genel'|'masalar'|'yazicilar'|'yemek'|'notlar';
+type Tab='genel'|'masalar'|'qr'|'yazicilar'|'yemek'|'notlar';
 
 export function SettingsPage(){
   const settings=useQuery({queryKey:['settings'],queryFn:()=>api<FullSettings>('/ayarlar')});
@@ -14,12 +15,13 @@ export function SettingsPage(){
   return <section className="op-page op-settings-page" aria-label="Ayarlar">
     <header className="op-page-head"><div><h1>Ayarlar</h1><p>İşletme bilgisi, masa düzeni, yazıcı yönlendirmesi ve işlem seçenekleri</p></div></header>
     <div className="op-tabs" role="group" aria-label="Ayar bölümleri">
-      {([['genel','Genel'],['masalar','Masalar ve bölümler'],['yazicilar','Yazıcılar'],['yemek','Yemek kartları'],['notlar','Hazır notlar']] as const).map(([id,label])=>
+      {([['genel','Genel'],['masalar','Masalar ve bölümler'],['qr','QR menü'],['yazicilar','Yazıcılar'],['yemek','Yemek kartları'],['notlar','Hazır notlar']] as const).map(([id,label])=>
         <button key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}>{label}</button>)}
     </div>
     <ErrorBox error={settings.error} retry={()=>void settings.refetch()}/>
     {settings.isPending?<Loading/>:settings.data&&(tab==='genel'?<General settings={settings.data}/>:tab==='masalar'?<FloorSetup/>:
       tab==='yazicilar'?<Printers key={JSON.stringify(settings.data.Yazicilar)} printers={settings.data.Yazicilar}/>:
+      tab==='qr'?<QrCodesPanel/>:
       tab==='yemek'?<MealCards key={JSON.stringify(settings.data.YemekKartlari)} cards={settings.data.YemekKartlari}/>:
       <QuickNotes key={settings.data.HazirNotlar.join('|')} notes={settings.data.HazirNotlar}/>)}
   </section>;

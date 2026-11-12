@@ -18,9 +18,10 @@ import {
   AlertCircle,
   RefreshCw,
   Printer,
+  FileText,
   ScanLine
 } from 'lucide-react';
-import type {Category,FullSettings,MealCard,OrderLine,Product,Receipt,ReceiptLocation,Section,Session,Table,PosCihazTipi,PosIslemKayit} from './types';
+import type {Account,Category,FullSettings,MealCard,OrderLine,Product,Receipt,ReceiptLocation,Section,Session,Table,PosCihazTipi,PosIslemKayit} from './types';
 import {
   api,
   money,
@@ -36,6 +37,7 @@ import {
 import {Empty,ErrorBox,Loading,Modal} from './ui';
 import {tablePath,tableRouteFromPath} from './routes';
 import {BillPrint} from './Barcode';
+import {InvoiceDetailsDialog} from './InvoiceDetails';
 import {OptionChooser} from './Options';
 import {SplitPaymentPanel} from './PaymentSplit';
 import './Extensions.css';
@@ -148,6 +150,7 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
   const settings=useQuery({queryKey:['settings'],queryFn:()=>api<FullSettings>('/ayarlar')});
   const wasteEnabled=admin&&settings.data?.ZayiAktif===true;
   const [printing,setPrinting]=useState(false);
+  const [invoice,setInvoice]=useState(false);
   const effectiveRemovalType=wasteEnabled?removalType:0;
 
   const receipt=useQuery({
@@ -301,6 +304,9 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
               onClick={()=>printMark.mutate(order.KayitNo)} title="Müşteriye bilgi fişi yazdır">
               <Printer size={15}/> <span>Adisyonu yazdır</span>
             </button>
+            <button type="button" className="secondary" disabled={busy} onClick={()=>setInvoice(true)} title="Fişe firma bilgisi yaz">
+              <FileText size={15}/> <span>{order.FaturaBilgisi?'Fatura bilgisi ✓':'Fatura bilgisi'}</span>
+            </button>
           </div>
         )}
         <ErrorBox error={printMark.error}/>
@@ -371,6 +377,7 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
       {payment&&order&&(
         <PaymentModal receipt={order} table={table} mealCards={settings.data?.YemekKartlari??[]} onClose={()=>setPayment(false)}/>
       )}
+      {invoice&&order&&<InvoiceDetailsDialog receipt={order} admin={admin} close={()=>setInvoice(false)}/>}
       {printing&&order&&<BillPrint receipt={order} store={settings.data?.Isletme} onDone={()=>setPrinting(false)}/>}
 
       {transfer&&(
@@ -806,6 +813,9 @@ function PaymentModal({receipt,table,mealCards,onClose}:{receipt:Receipt;table:T
   const isPartial=mode==='partial';
   const [mealCardId,setMealCardId]=useState('');
   const activeMealCards=mealCards.filter(card=>card.Aktif);
+  const accounts=useQuery({queryKey:['accounts',''],queryFn:()=>api<Account[]>('/cari')});
+  const activeAccounts=(accounts.data??[]).filter(item=>item.Aktif);
+  const [accountId,setAccountId]=useState('');
   const [cash,setCash]=useState(kalanTutar.toFixed(2));
   const [card,setCard]=useState('0');
   const [account,setAccount]=useState('0');
@@ -833,7 +843,8 @@ function PaymentModal({receipt,table,mealCards,onClose}:{receipt:Receipt;table:T
   const needsIntegratedPos=centsCard!==null&&centsCard>0&&(posDevice===1||posDevice===2);
   const posApproved=needsIntegratedPos?posTx?.Basarili===true:true;
   const needsMealCard=centsMealCard!==null&&centsMealCard>0&&activeMealCards.length>0&&!mealCardId;
-  const canSubmit=validTotal&&posApproved&&!needsMealCard;
+  const needsAccount=centsAccount!==null&&centsAccount>0&&activeAccounts.length>0&&!accountId;
+  const canSubmit=validTotal&&posApproved&&!needsMealCard&&!needsAccount;
 
   const quickFill=(type:'cash'|'card'|'mealCard')=>{
     const remaining=kalanTutar.toFixed(2);
@@ -900,7 +911,8 @@ function PaymentModal({receipt,table,mealCards,onClose}:{receipt:Receipt;table:T
       IndirimTutar:centsDiscount!/100,
       KismiOdeme:isPartial,
       PosIslemId:posTx?.IslemId,
-      YemekKartiKayitNo:centsMealCard&&mealCardId?Number(mealCardId):null
+      YemekKartiKayitNo:centsMealCard&&mealCardId?Number(mealCardId):null,
+      CariHesapKayitNo:centsAccount&&accountId?Number(accountId):null
     }),
     onSuccess:async()=>{
       await client.invalidateQueries();
@@ -1019,6 +1031,15 @@ function PaymentModal({receipt,table,mealCards,onClose}:{receipt:Receipt;table:T
             disabled={payMutation.isPending}
           />
         </label>
+        {centsAccount!==null&&centsAccount>0&&activeAccounts.length>0&&(
+          <label>
+            Cari hesap
+            <select value={accountId} onChange={e=>setAccountId(e.target.value)} disabled={payMutation.isPending}>
+              <option value="">Hesap seçin</option>
+              {activeAccounts.map(item=><option key={item.KayitNo} value={item.KayitNo}>{item.Unvan} · bakiye {money(item.Bakiye)}{item.KrediLimiti?` / limit ${money(item.KrediLimiti)}`:''}</option>)}
+            </select>
+          </label>
+        )}
         <label style={{gridColumn:'1 / -1'}}>
           İndirim Tutarı
           <input

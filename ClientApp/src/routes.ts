@@ -1,8 +1,8 @@
-export type Page='genel-bakis'|'masalar'|'paket-servis'|'mutfak'|'menu'|'raporlar'|'adisyonlar'|'stok'|'personel'|'rezervasyonlar'|'entegrasyonlar'|'ayarlar';
+export type Page='genel-bakis'|'masalar'|'paket-servis'|'mutfak'|'menu'|'raporlar'|'adisyonlar'|'kasa'|'hizli-satis'|'stok'|'personel'|'rezervasyonlar'|'entegrasyonlar'|'ayarlar';
 export type Role='Admin'|'Garson'|'Mutfak';
 
-const adminPages:Page[]=['genel-bakis','raporlar','adisyonlar','stok','personel','rezervasyonlar','entegrasyonlar','ayarlar'];
-const pagePattern=/^\/app\/(genel-bakis|masalar|paket-servis|mutfak|menu|raporlar|adisyonlar|stok|personel|rezervasyonlar|entegrasyonlar|ayarlar)\/?$/;
+const adminPages:Page[]=['genel-bakis','raporlar','adisyonlar','kasa','hizli-satis','stok','personel','rezervasyonlar','entegrasyonlar','ayarlar'];
+const pagePattern=/^\/app\/(genel-bakis|masalar|paket-servis|mutfak|menu|raporlar|adisyonlar|kasa|hizli-satis|stok|personel|rezervasyonlar|entegrasyonlar|ayarlar)\/?$/;
 
 export function pageFromPath(path:string):Page|null {
   if (tableRouteFromPath(path)) return 'masalar';

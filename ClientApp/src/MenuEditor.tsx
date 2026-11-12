@@ -1,6 +1,8 @@
 import {useState} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {api,toCents} from './api';
+import {ALLERGENS} from './types';
+import {ProductImageEditor} from './ProductImage';
 import type {Category,FullSettings,OptionGroup,Product} from './types';
 import {ErrorBox,Modal} from './ui';
 
@@ -96,6 +98,8 @@ export function ProductEditor({categories,product,close}:{categories:Category[];
   const [portions,setPortions]=useState((product?.Porsiyonlar??[]).map(item=>({name:item.PorsiyonAdi,price:String(item.Fiyat),factor:String(item.Carpan??1)})));
   const [vat,setVat]=useState(String(product?.KdvOrani??10));
   const [barcode,setBarcode]=useState(product?.Barkod??'');
+  const [description,setDescription]=useState(product?.Aciklama??'');
+  const [allergens,setAllergens]=useState<string[]>(product?.Alerjenler??[]);
   const [quickNotes,setQuickNotes]=useState<string[]>(product?.HazirNotlar??[]);
   const [quickNoteSaving,setQuickNoteSaving]=useState(false);
   const [groups,setGroups]=useState<OptionDraft[]>((product?.SecenekGruplari??[]).map(group=>({name:group.Ad,required:group.Zorunlu,multi:group.CokluSecim,
@@ -107,7 +111,7 @@ export function ProductEditor({categories,product,close}:{categories:Category[];
   const valid=!!categoryId&&!!name.trim()&&toCents(price)!==null&&portions.length<=10&&portionsValid&&groupsValid&&/^[A-Za-z0-9.-]{0,32}$/.test(barcode.trim());
   const save=useMutation({mutationFn:()=>api(`/menu/urunler${product?`/${product.KayitNo}`:''}`,{
     method:product?'PUT':'POST',body:JSON.stringify({GrupKayitNo:Number(categoryId),StokAdi:name.trim(),SatisFiyati:toCents(price)!/100,Aktif:active,
-      KdvOrani:Number(vat),Barkod:barcode.trim()||null,
+      KdvOrani:Number(vat),Barkod:barcode.trim()||null,Aciklama:description.trim()||null,Alerjenler:allergens,
       HazirNotlar:quickNotes,
       Porsiyonlar:portions.map(item=>({PorsiyonAdi:item.name.trim(),Fiyat:toCents(item.price)!/100,Carpan:Number(item.factor.replace(',','.'))})),
       SecenekGruplari:groups.map(group=>({Ad:group.name.trim(),Zorunlu:group.required,CokluSecim:group.multi,
@@ -119,6 +123,10 @@ export function ProductEditor({categories,product,close}:{categories:Category[];
     <div className="form-row"><label>KDV oranı<select value={vat} onChange={event=>setVat(event.target.value)}>{[0,1,10,20].map(rate=><option key={rate} value={rate}>%{rate}</option>)}</select></label>
       <label>Barkod (isteğe bağlı)<input maxLength={32} value={barcode} onChange={event=>setBarcode(event.target.value)} placeholder="Okutun veya yazın"/></label></div>
     <label className="op-check-label"><input type="checkbox" checked={active} onChange={event=>setActive(event.target.checked)}/> Satışta</label>
+    <label>Müşteri menüsünde açıklama (isteğe bağlı)<input maxLength={300} value={description} onChange={event=>setDescription(event.target.value)} placeholder="ör. Günlük taze, odun ateşinde"/></label>
+    <div className="op-editor-heading"><strong>Alerjenler</strong></div>
+    <div className="op-inline-checks">{ALLERGENS.map(item=><label key={item}><input type="checkbox" checked={allergens.includes(item)} onChange={event=>setAllergens(list=>event.target.checked?[...list,item]:list.filter(x=>x!==item))}/>{item}</label>)}</div>
+    {product?<ProductImageEditor product={product}/>:<p className="op-note">Görsel, ürün kaydedildikten sonra eklenebilir.</p>}
     <ProductQuickNotes selected={quickNotes} change={setQuickNotes} creating={setQuickNoteSaving}/>
     <div className="op-editor-heading"><strong>Porsiyonlar</strong><button type="button" className="secondary" disabled={portions.length>=10||!portionsValid} onClick={()=>setPortions(items=>[...items,{name:'',price:'',factor:'1'}])}>Porsiyon ekle</button></div>
     {!portionsComplete&&<p className="op-note" role="status">Yeni porsiyon açmak için mevcut porsiyonun adını, fiyatını ve reçete çarpanını doldurun.</p>}

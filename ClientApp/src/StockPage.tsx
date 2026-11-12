@@ -5,6 +5,7 @@ import {api,money} from './api';
 import type {Category,Ingredient,ProductCost,RecipeRow,StockMovement,StockMovementType} from './types';
 import {Empty,ErrorBox,Loading,Modal} from './ui';
 import './Extensions.css';
+import {downloadCsv} from './csv';
 
 const units=['kg','g','lt','ml','adet','porsiyon'];
 const movementNames:Record<StockMovementType,string>={0:'Giriş',1:'Çıkış',2:'Sayım',3:'Satış',4:'Satış iadesi'};
@@ -32,7 +33,9 @@ function Ingredients({list}:{list:Ingredient[]}){
   const [edit,setEdit]=useState<Ingredient|true|null>(null);
   const [move,setMove]=useState<Ingredient|null>(null);
   return <>
-    <div className="op-toolbar-row"><button className="primary" onClick={()=>setEdit(true)}><Plus size={16}/> Hammadde ekle</button></div>
+    <div className="op-toolbar-row"><button className="primary" onClick={()=>setEdit(true)}><Plus size={16}/> Hammadde ekle</button>
+      <button className="secondary" disabled={!list.length} onClick={()=>downloadCsv('stok',['Hammadde','Birim','Stok','Kritik seviye','Birim maliyet','Stok değeri','Durum'],
+        list.map(i=>[i.Ad,i.Birim,i.Stok,i.KritikSeviye,i.BirimMaliyet,Math.max(0,i.Stok)*i.BirimMaliyet,!i.Aktif?'Pasif':i.Kritik?'Kritik':'Normal']))}>CSV indir</button></div>
     {list.length===0?<Empty><Boxes size={28}/><h2>Hammadde yok</h2></Empty>:<section className="op-panel"><div className="op-table-wrap"><table className="op-data-table">
       <thead><tr><th>Hammadde</th><th className="num">Stok</th><th className="num">Kritik seviye</th><th className="num">Birim maliyet</th><th className="num">Stok değeri</th><th></th></tr></thead>
       <tbody>{list.map(item=><tr key={item.KayitNo}>

@@ -5,6 +5,7 @@ import {api,localDate,money} from './api';
 import type {CourierSummary,DeliveryCollection,MealCardSummary,PeriodReport,StaffReport,VatRow} from './types';
 import {Empty,ErrorBox,Loading} from './ui';
 import './Extensions.css';
+import {downloadCsv} from './csv';
 
 export type ReportTab='gunluk'|'donem'|'personel';
 
@@ -31,7 +32,7 @@ export function MealCardPanel({rows}:{rows:MealCardSummary[]}){
 }
 
 /** Extra daily panels: delivery collections, couriers, VAT and meal cards. */
-export function DailyExtras({collection,couriers,vat,mealCards,refunds}:{collection:DeliveryCollection;couriers:CourierSummary[];vat:VatRow[];mealCards:MealCardSummary[];refunds:number}){
+export function DailyExtras({collection,couriers,vat,mealCards,refunds,till}:{collection:DeliveryCollection;couriers:CourierSummary[];vat:VatRow[];mealCards:MealCardSummary[];refunds:number;till?:{expected:number;cashIn:number;cashOut:number;accountCash:number;accountBank:number}}){
   return <>
     <div className="op-report-columns">
       <section className="op-panel"><div className="op-panel-head"><h2>Paket tahsilatı</h2><small>Yönetici doğruladığında kasaya girer</small></div><div className="op-report-rows">
@@ -39,6 +40,9 @@ export function DailyExtras({collection,couriers,vat,mealCards,refunds}:{collect
         <div><span>Kapıda kart</span><strong>{money(collection.Kart)}</strong></div>
         <div><span>Çevrim içi ödenmiş</span><strong>{money(collection.Online)}</strong></div>
         <div><span>Tahsilatı bekleyen<small>{collection.BekleyenSayisi} teslimat, tüm günler</small></span><strong>{money(collection.Bekleyen)}</strong></div>
+        {till&&<div><span>Cari tahsilatı<small>Nakit {money(till.accountCash)} · kart {money(till.accountBank)}</small></span><strong>{money(till.accountCash+till.accountBank)}</strong></div>}
+        {till&&(till.cashIn>0||till.cashOut>0)&&<div><span>Kasa giriş / çıkış<small>Kasa ve cari ekranından</small></span><strong>{money(till.cashIn)} / -{money(till.cashOut)}</strong></div>}
+        {till&&<div><span>Beklenen kasa nakdi</span><strong>{money(till.expected)}</strong></div>}
         {refunds>0&&<div><span>Bugün yapılan iadeler<small>Satıştan ve tahsilattan düşülür</small></span><strong>-{money(refunds)}</strong></div>}
       </div></section>
       <section className="op-panel"><div className="op-panel-head"><h2>Kurye hesabı</h2></div>{couriers.length===0?<div className="op-inline-empty">Bu tarihte teslim edilen paket yok.</div>:
@@ -66,6 +70,8 @@ export function PeriodReportView({tabs}:{tabs:ReactNode}){
     <ErrorBox error={report.error} retry={()=>void report.refetch()}/>
     {report.isPending?<Loading/>:data&&<div className="op-stack">
       <div className="op-report-lead"><div><span>Toplam satış</span><strong>{money(data.Toplam.ToplamSatis)}</strong><small>{data.Toplam.AdisyonSayisi} adisyon</small></div><div><span>Masa / paket</span><strong>{money(data.Toplam.MasaSatis)}</strong><small>Paket {money(data.Toplam.PaketSatis)}</small></div><div><span>İptal / zayi / ikram / iade</span><strong>{money(data.Toplam.Iptal+data.Toplam.Zayi+data.Toplam.Ikram)}</strong><small>İade {money(data.Toplam.Iade)}</small></div></div>
+      <div className="op-toolbar-row"><button className="secondary" onClick={()=>downloadCsv(`donem-${data.Baslangic}-${data.Bitis}`,['Tarih','Adisyon','Masa satış','Paket satış','İade','Toplam satış','Nakit','Kart','Yemek kartı','Cari','İndirim','İptal','Zayi','İkram','Vardiya kapalı'],
+        data.Gunler.map(d=>[d.Tarih,d.AdisyonSayisi,d.MasaSatis,d.PaketSatis,d.Iade,d.ToplamSatis,d.Nakit,d.Banka,d.YemekKarti,d.Cari,d.Indirim,d.Iptal,d.Zayi,d.Ikram,d.VardiyaKapali?'Evet':'Hayır']))}>CSV indir</button></div>
       <section className="op-panel"><div className="op-panel-head"><h2>Günlere göre</h2><small>{data.Gunler.filter(d=>d.VardiyaKapali).length} / {data.Gunler.length} gün vardiyası kapalı</small></div><div className="op-table-wrap"><table className="op-data-table">
         <thead><tr><th>Gün</th><th className="num">Adisyon</th><th className="num">Masa</th><th className="num">Paket</th><th className="num">İade</th><th className="num">Toplam</th><th className="num">Nakit</th><th className="num">Kart</th><th className="num">Yemek k.</th><th className="num">Cari</th><th className="num">İptal</th><th className="num">Zayi</th><th></th></tr></thead>
         <tbody>{data.Gunler.map(d=><tr key={d.Tarih}><td>{new Date(`${d.Tarih}T12:00:00`).toLocaleDateString('tr-TR',{weekday:'short',day:'2-digit',month:'2-digit'})}</td><td className="num">{d.AdisyonSayisi}</td><td className="num">{money(d.MasaSatis)}</td><td className="num">{money(d.PaketSatis)}</td><td className="num">{d.Iade?money(-d.Iade):'—'}</td><td className="num"><strong>{money(d.ToplamSatis)}</strong></td><td className="num">{money(d.Nakit)}</td><td className="num">{money(d.Banka)}</td><td className="num">{money(d.YemekKarti)}</td><td className="num">{money(d.Cari)}</td><td className="num">{money(d.Iptal)}</td><td className="num">{money(d.Zayi)}</td><td>{d.VardiyaKapali&&<span className="op-badge is-success">Kapalı</span>}</td></tr>)}</tbody>
@@ -85,6 +91,8 @@ export function StaffReportView({tabs}:{tabs:ReactNode}){
   return <section className="op-page op-report" aria-label="Personel raporu">
     <RangeHead title="Personel raporu" text="Satış, ürünü giren personele; tahsilat ve iade işlemi yapan personele yazılır. İptal, zayi ve ikram işlem kayıtlarından gelir." start={start} end={end} setStart={setStart} setEnd={setEnd} tabs={tabs}/>
     <ErrorBox error={report.error} retry={()=>void report.refetch()}/>
+    {rows.length>0&&<div className="op-toolbar-row"><button className="secondary" onClick={()=>downloadCsv(`personel-${start}-${end}`,['Personel','Rol','Açtığı adisyon','Ürün adedi','Satış','İptal sayısı','İptal','Zayi','İkram','Tahsilat','İade'],
+      rows.map(r=>[r.PersonelAdi,r.Rol,r.AcilanAdisyon,r.UrunAdedi,r.SatisTutari,r.IptalSayisi,r.IptalTutari,r.ZayiTutari,r.IkramTutari,r.TahsilatTutari,r.IadeTutari]))}>CSV indir</button></div>}
     {report.isPending?<Loading/>:rows.length===0?<Empty>Bu aralıkta personel işlemi yok.</Empty>:<section className="op-panel"><div className="op-table-wrap"><table className="op-data-table">
       <thead><tr><th>Personel</th><th className="num">Açtığı adisyon</th><th className="num">Ürün adedi</th><th className="num">Satış</th><th className="num">İptal</th><th className="num">Zayi</th><th className="num">İkram</th><th className="num">Tahsilat</th><th className="num">İade</th></tr></thead>
       <tbody>{rows.map(r=><tr key={r.PersonelId}><td><strong>{r.PersonelAdi}</strong><small>{r.Rol==='Admin'?'Yönetici':r.Rol??'—'}</small></td><td className="num">{r.AcilanAdisyon}</td><td className="num">{r.UrunAdedi}</td><td className="num">{money(r.SatisTutari)}</td>

@@ -2,10 +2,11 @@ import {useState} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {Printer,ReceiptText,RotateCcw,Shuffle} from 'lucide-react';
 import {api,money,toCents} from './api';
-import type {FullSettings,ReceiptHistoryDetail,ReceiptSummary,Report} from './types';
+import type {Account,FullSettings,ReceiptHistoryDetail,ReceiptSummary,Report} from './types';
 import {BillPrint} from './Barcode';
 import {Empty,ErrorBox,Loading,Modal} from './ui';
 import './Extensions.css';
+import {downloadCsv} from './csv';
 
 export default function ReceiptsPage(){
   const today=useQuery({queryKey:['report','today'],queryFn:()=>api<Report>('/raporlar/gunluk')});
@@ -22,7 +23,9 @@ export default function ReceiptsPage(){
       <div className="op-toolbar-row"><label className="op-date-field">İşletme tarihi <input type="date" value={day} onChange={e=>setDate(e.target.value)}/></label>
         <label className="op-check-label"><input type="checkbox" checked={includeOpen} onChange={e=>setIncludeOpen(e.target.checked)}/> Açık adisyonları da göster</label></div></header>
     <ErrorBox error={today.error||list.error} retry={()=>void list.refetch()}/>
-    {list.isPending&&day?<Loading/>:rows.length===0?<Empty><ReceiptText size={28}/><h2>Bu tarihte adisyon yok</h2><p>Başka bir işletme günü seçin.</p></Empty>:
+    {list.isPending&&day?<Loading/>:rows.length===0?<Empty><ReceiptText size={28}/><h2>Bu tarihte adisyon yok</h2><p>Başka bir işletme günü seçin.</p></Empty>:<>
+    <div className="op-toolbar-row"><button className="secondary" onClick={()=>downloadCsv(`adisyonlar-${day}`,['No','Masa','Personel','Açılış','Kapanış','Durum','Toplam','İndirim','Nakit','Kart','Yemek kartı','Cari','İade'],
+      rows.map(r=>[r.KayitNo,r.MasaAdi,r.PersonelAdi,r.AcilisTarihi&&new Date(r.AcilisTarihi).toLocaleString('tr-TR'),r.KapanisTarihi&&new Date(r.KapanisTarihi).toLocaleString('tr-TR'),!r.Kapali?'Açık':r.Birlesti?'Birleşti':'Kapalı',r.GenelToplam,r.Indirim,r.Nakit,r.Banka,r.YemekKarti,r.Cari,r.Iade]))}>CSV indir</button></div>
     <section className="op-panel"><div className="op-panel-head"><h2>{closed.length} kapanan adisyon</h2><small>Toplam {money(closed.reduce((s,r)=>s+r.GenelToplam-r.Indirim-r.Iade,0))}</small></div>
       <div className="op-table-wrap"><table className="op-data-table">
       <thead><tr><th>No</th><th>Masa</th><th>Kapanış</th><th>Ödeme</th><th className="num">Tutar</th><th></th></tr></thead>
@@ -33,7 +36,7 @@ export default function ReceiptsPage(){
         <td><small>{[r.Nakit&&`Nakit ${money(r.Nakit)}`,r.Banka&&`Kart ${money(r.Banka)}`,r.YemekKarti&&`Yemek ${money(r.YemekKarti)}`,r.Cari&&`Cari ${money(r.Cari)}`].filter(Boolean).join(' · ')||'—'}</small></td>
         <td className="num">{money(r.GenelToplam-r.Indirim)}{r.Iade>0&&<small>İade {money(r.Iade)}</small>}</td>
         <td>{!r.Kapali?<span className="op-badge is-warning">Açık</span>:r.Birlesti?<span className="op-badge">Birleşti</span>:r.Iade>0?<span className="op-badge is-danger">İadeli</span>:null}</td>
-      </tr>)}</tbody></table></div></section>}
+      </tr>)}</tbody></table></div></section></>}
     {selected!==null&&<ReceiptDetail id={selected} close={()=>setSelected(null)}/>}
   </section>;
 }
@@ -93,10 +96,13 @@ function PaymentEdit({detail,mode,mealCards,close}:{detail:ReceiptHistoryDetail;
   const limits=[(r.NakitToplam??0)-refunded('Nakit'),(r.BankaToplam??0)-refunded('Banka'),(r.YemekKartiToplam??0)-refunded('YemekKarti'),(r.CariToplam??0)-refunded('Cari')].map(v=>Math.round(v*100));
   const valid=parsed&&reason.trim().length>0&&(mode==='correct'?total===paidTotal:total>0&&cents.every((c,i)=>c!<=limits[i]));
   const active=mealCards.filter(c=>c.Aktif);
-  const needsCard=mode==='correct'&&(cents[2]??0)>0&&active.length>0&&!mealCard;
+  const accounts=useQuery({queryKey:['accounts',''],queryFn:()=>api<Account[]>('/cari')});
+  const activeAccounts=(accounts.data??[]).filter(a=>a.Aktif);
+  const [accountId,setAccountId]=useState(String(r.CariHesapKayitNo??''));
+  const needsCard=mode==='correct'&&(((cents[2]??0)>0&&active.length>0&&!mealCard)||((cents[3]??0)>0&&activeAccounts.length>0&&!accountId));
   const save=useMutation({mutationFn:()=>api(`/adisyonlar/${r.KayitNo}/${mode==='correct'?'odeme-duzelt':'iade'}`,{method:'POST',body:JSON.stringify({
       Nakit:cents[0]!/100,Banka:cents[1]!/100,YemekKarti:cents[2]!/100,Cari:cents[3]!/100,Gerekce:reason.trim(),
-      ...(mode==='correct'?{YemekKartiKayitNo:(cents[2]??0)>0&&mealCard?Number(mealCard):null}:{})})}),
+      ...(mode==='correct'?{YemekKartiKayitNo:(cents[2]??0)>0&&mealCard?Number(mealCard):null,CariHesapKayitNo:(cents[3]??0)>0&&accountId?Number(accountId):null}:{})})}),
     onSuccess:async()=>{await client.invalidateQueries();close();}});
   const field=(label:string,value:string,set:(v:string)=>void,limit:number)=><label>{label}{mode==='refund'&&<small> en fazla {money(limit/100)}</small>}<input inputMode="decimal" value={value} onChange={e=>set(e.target.value)}/></label>;
   return <section className="op-form-card" aria-label={mode==='correct'?'Ödeme düzeltme':'İade'}>
@@ -105,6 +111,7 @@ function PaymentEdit({detail,mode,mealCards,close}:{detail:ReceiptHistoryDetail;
     <div className="craft-form">
       <div className="form-row">{field('Nakit',cash,setCash,limits[0])}{field('Banka kartı',card,setCard,limits[1])}</div>
       <div className="form-row">{field('Yemek kartı',meal,setMeal,limits[2])}{field('Cari',account,setAccount,limits[3])}</div>
+      {mode==='correct'&&(cents[3]??0)>0&&activeAccounts.length>0&&<label>Cari hesap<select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Hesap seçin</option>{activeAccounts.map(a=><option key={a.KayitNo} value={a.KayitNo}>{a.Unvan}</option>)}</select></label>}
       {mode==='correct'&&(cents[2]??0)>0&&active.length>0&&<label>Yemek kartı türü<select value={mealCard} onChange={e=>setMealCard(e.target.value)}><option value="">Kart seçin</option>{active.map(c=><option key={c.KayitNo} value={c.KayitNo}>{c.Ad}</option>)}</select></label>}
       <label>Gerekçe<input required maxLength={200} value={reason} onChange={e=>setReason(e.target.value)} placeholder={mode==='correct'?'ör. kartla ödemişti, nakit girildi':'ör. ürün soğuk geldi'}/></label>
       {mode==='correct'&&parsed&&total!==paidTotal&&<p className="error-text" role="status">Girilen toplam {money(total/100)}; {money(paidTotal/100)} olmalı.</p>}
