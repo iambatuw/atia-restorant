@@ -90,6 +90,10 @@ public class AdisyonBaslikDTO
     public int YazdirmaSayisi { get; set; }
     public long? YemekKartiKayitNo { get; set; }
     public string? YemekKartiAdi { get; set; }
+    public long? CariHesapKayitNo { get; set; }
+    public string? CariHesapAdi { get; set; }
+    public AdisyonFaturaBilgisiDTO? FaturaBilgisi { get; set; }
+    public bool HizliSatis { get; set; }
 }
 
 // ───── SİPARİŞ EKLEME ─────
@@ -181,6 +185,7 @@ public class OdemeRequest
     /// <summary>Optional item-based payment: the server calculates the amount from these lines.</summary>
     public List<AyrilanSatir>? OdenenSatirlar { get; set; }
     public long? YemekKartiKayitNo { get; set; }
+    public long? CariHesapKayitNo { get; set; }
 }
 
 // ───── POS CİHAZ ENTEGRASYONU & DURUM MAKİNESİ ─────
@@ -289,6 +294,11 @@ public class MenuUrunDTO
     public List<SecenekGrubuDTO> SecenekGruplari { get; set; } = new();
     public List<string>? HazirNotlar { get; set; }
     public List<ReceteSatiriDTO> Recete { get; set; } = new();
+    public string? Aciklama { get; set; }
+    public List<string> Alerjenler { get; set; } = new();
+    /// <summary>0 when the product has no photo; otherwise increases on every upload for cache busting.</summary>
+    public int GorselSurumu { get; set; }
+    public string? GorselTuru { get; set; }
 }
 
 public class MenuKategoriYazRequest
@@ -306,6 +316,9 @@ public class MenuUrunYazRequest
     public string? Barkod { get; set; }
     public List<SecenekGrubuDTO>? SecenekGruplari { get; set; }
     public List<string>? HazirNotlar { get; set; }
+    public string? Aciklama { get; set; }
+    /// <summary>Null keeps the current allergen list (older clients).</summary>
+    public List<string>? Alerjenler { get; set; }
 }
 
 public class PorsiyonDTO
@@ -528,6 +541,11 @@ public class GunlukRaporDTO
     public PaketTahsilatDTO PaketTahsilat { get; set; } = new();
     public List<KuryeOzetDTO> KuryeOzeti { get; set; } = new();
     public decimal BeklenenKasaNakdi { get; set; }
+    public decimal KasaGiris { get; set; }
+    public decimal KasaCikis { get; set; }
+    public decimal CariTahsilatNakit { get; set; }
+    public decimal CariTahsilatBanka { get; set; }
+    public List<KasaHareketiDTO> KasaHareketleri { get; set; } = new();
 }
 
 public class VardiyaKapanisRequest

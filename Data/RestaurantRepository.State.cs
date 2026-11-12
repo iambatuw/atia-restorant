@@ -20,6 +20,8 @@ public sealed partial class RestaurantRepository
     private long _cfgStoreId = 1;
     private DateTime? _cfgLastSave;
     private string? _cfgLastError;
+    private DateOnly? _cfgLastBackupDay;
+    private const int BackupDays = 14;
 
     private static IEnumerable<FieldInfo> StateFields() => typeof(RestaurantRepository)
         .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
@@ -83,6 +85,7 @@ public sealed partial class RestaurantRepository
             var temporary = _cfgStatePath + ".tmp";
             File.WriteAllText(temporary, root.ToJsonString(SnapshotJson));
             File.Move(temporary, _cfgStatePath, overwrite: true);
+            BackupDaily();
             _cfgLastSave = Now;
             _cfgLastError = null;
         }
@@ -91,6 +94,20 @@ public sealed partial class RestaurantRepository
             // The in-memory change already happened; surface the failure instead of hiding it.
             _cfgLastError = $"Demo verisi diske yazılamadı: {exception.Message}";
         }
+    }
+
+    /// <summary>Keeps one copy per business day in App_Data/yedekler for the last 14 days.</summary>
+    private void BackupDaily()
+    {
+        var day = BusinessToday;
+        if (_cfgLastBackupDay == day) return;
+        var directory = Path.Combine(Path.GetDirectoryName(_cfgStatePath!)!, "yedekler");
+        Directory.CreateDirectory(directory);
+        var target = Path.Combine(directory, $"demo-state-{day:yyyyMMdd}.json");
+        if (!File.Exists(target)) File.Copy(_cfgStatePath!, target);
+        foreach (var old in Directory.GetFiles(directory, "demo-state-*.json").OrderByDescending(f => f, StringComparer.Ordinal).Skip(BackupDays))
+            File.Delete(old);
+        _cfgLastBackupDay = day;
     }
 
     public DemoDurumDTO DemoStatus() { lock (_gate) return new() { Kalici = IsPersistent, SonKayit = _cfgLastSave, SonHata = _cfgLastError }; }

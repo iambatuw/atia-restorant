@@ -105,6 +105,58 @@ public static class OperationsEndpoints
             Ok(repository.StockMovements(hammadde, Actor(user)))).RequireAuthorization("Admin");
         api.MapGet("/stok/maliyet", (ClaimsPrincipal user, RestaurantRepository repository) =>
             Ok(repository.RecipeCosts(Actor(user)))).RequireAuthorization("Admin");
+        // ── Cari hesap, kasa hareketi, fatura bilgisi ──
+        api.MapGet("/cari", (string? ara, ClaimsPrincipal user, RestaurantRepository repository) =>
+            Ok(repository.Accounts(ara, Actor(user)))).RequireAuthorization("Admin");
+        api.MapPost("/cari", (CariHesapYazRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.SaveAccount(null, request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+        api.MapPut("/cari/{id:long}", (long id, CariHesapYazRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.SaveAccount(id, request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+        api.MapGet("/cari/{id:long}/ekstre", (long id, ClaimsPrincipal user, RestaurantRepository repository) =>
+            Ok(repository.AccountStatement(id, Actor(user)))).RequireAuthorization("Admin");
+        api.MapPost("/cari/{id:long}/tahsilat", (long id, CariTahsilatRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.CollectAccount(id, request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+        api.MapGet("/kasa/hareketler", (string? tarih, ClaimsPrincipal user, RestaurantRepository repository) =>
+            Ok(repository.CashMovements(ParseDate(tarih) ?? repository.BusinessToday, Actor(user)))).RequireAuthorization("Admin");
+        api.MapPost("/kasa/hareketler", (KasaHareketiRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.AddCashMovement(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+        api.MapPut("/adisyonlar/{id:long}/fatura-bilgisi", (long id, AdisyonFaturaBilgisiDTO? request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.SetInvoiceDetails(id, request, Actor(user)), hub, logs)).RequireAuthorization("Orders");
+
+        // ── Hızlı satış ──
+        api.MapPost("/hizli-satis", (HizliSatisRequest request, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.QuickSale(request, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+
+        // ── QR menü ve garson çağırma ──
+        api.MapGet("/masalar/qr", (ClaimsPrincipal user, RestaurantRepository repository) =>
+            Ok(repository.TableQrCodes(Actor(user)))).RequireAuthorization("Admin");
+        api.MapPost("/masalar/{id:long}/qr-yenile", (long id, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.RenewTableQr(id, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+        api.MapGet("/qr/{kod}", (string kod, RestaurantRepository repository) => Ok(repository.TableForGuest(kod))).AllowAnonymous();
+        api.MapPost("/cagri", (CagriRequest request, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.CallStaff(request), hub, logs)).AllowAnonymous().RequireRateLimiting("guest");
+        api.MapGet("/cagrilar", (ClaimsPrincipal user, RestaurantRepository repository) =>
+            Ok(repository.OpenCalls(Actor(user)))).RequireAuthorization("Orders");
+        api.MapPost("/cagrilar/{id:long}/tamam", (long id, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.CompleteCall(id, Actor(user)), hub, logs)).RequireAuthorization("Orders");
+
+        // ── Ürün görseli ──
+        api.MapPost("/menu/urunler/{id:long}/gorsel", async (long id, IFormFile? dosya, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+        {
+            if (dosya is null || dosya.Length is 0 or > 2 * 1024 * 1024) throw new ApiException(400, "En fazla 2 MB bir görsel seçin.");
+            using var buffer = new MemoryStream();
+            await dosya.CopyToAsync(buffer);
+            return await Mutate(() => repository.SaveProductImage(id, dosya.ContentType, buffer.ToArray(), Actor(user)), hub, logs);
+        }).RequireAuthorization("Admin").DisableAntiforgery();
+        api.MapDelete("/menu/urunler/{id:long}/gorsel", (long id, ClaimsPrincipal user, RestaurantRepository repository, IHubContext<RestorantHub> hub, ILoggerFactory logs) =>
+            Mutate(() => repository.DeleteProductImage(id, Actor(user)), hub, logs)).RequireAuthorization("Admin");
+        api.MapGet("/menu/urunler/{id:long}/gorsel", (long id, RestaurantRepository repository, HttpContext context) =>
+        {
+            if (repository.ProductImage(id) is not { } image) return Results.NotFound();
+            context.Response.Headers.CacheControl = "public, max-age=86400";
+            context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return Results.File(image.Data, image.Type);
+        }).AllowAnonymous();
         return api;
     }
 

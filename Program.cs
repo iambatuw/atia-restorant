@@ -71,10 +71,16 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
         { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
+    // Anonymous QR-menu calls ("garson çağır") are limited per address to stop flooding the staff screens.
+    options.AddPolicy("guest", context => RateLimitPartition.GetFixedWindowLimiter(
+        "guest:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"), _ => new FixedWindowRateLimiterOptions
+        { PermitLimit = 6, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
     options.OnRejected = async (context, cancellationToken) =>
     {
         context.HttpContext.Response.Headers.RetryAfter = "60";
-        await Results.Problem(statusCode: 429, title: "Çok fazla oturum açma denemesi.").ExecuteAsync(context.HttpContext);
+        var guest = context.HttpContext.Request.Path.StartsWithSegments("/api/cagri");
+        await Results.Problem(statusCode: 429, title: guest ? "Çok fazla istek gönderildi; lütfen biraz bekleyin." : "Çok fazla oturum açma denemesi.")
+            .ExecuteAsync(context.HttpContext);
     };
 });
 if (builder.Environment.IsDevelopment()) builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>

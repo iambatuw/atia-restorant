@@ -253,6 +253,8 @@ public sealed partial class RestaurantRepository
         product.GrupKayitNo = category.KayitNo; product.GrupAdi = category.GrupAdi; product.Aktif = request.Aktif;
         product.KdvOrani = request.KdvOrani; product.Barkod = barcode; product.SecenekGruplari = optionGroups;
         product.HazirNotlar = quickNotes.Select(note => _quickNotes.First(item => string.Equals(item, note, StringComparison.OrdinalIgnoreCase))).ToList();
+        product.Aciklama = Optional(request.Aciklama, 300, "Ürün açıklaması");
+        if (request.Alerjenler is not null) product.Alerjenler = NormalizeAllergens(request.Alerjenler);
         product.Porsiyonlar = portions.Select(p => new PorsiyonDTO
             { KayitNo = ++_nextPortion, PorsiyonAdi = p.PorsiyonAdi!.Trim(), Fiyat = p.Fiyat, Carpan = p.Carpan }).ToList();
         if (previous is not null) _menu.Single(c => c.Urunler.Contains(previous)).Urunler.Remove(previous);
@@ -553,6 +555,7 @@ public sealed partial class RestaurantRepository
         decimal kalanTutar = receipt.GenelToplam - oncekiOdenen;
         decimal buOdemeToplami = values.Sum();
         var card = MealCard(request.YemekKartiTutar, request.YemekKartiKayitNo);
+        var account = CheckAccountCharge(request.CariTutar, request.CariHesapKayitNo);
         var itemPayment = request.OdenenSatirlar is { Count: > 0 };
         if (itemPayment)
         {
@@ -602,6 +605,11 @@ public sealed partial class RestaurantRepository
             posTx.Durum = PosDurum.ErpKaydedildi;
         if (itemPayment) ApplyItemPayment(receipt, request.OdenenSatirlar!);
         if (card is not null) { receipt.YemekKartiKayitNo = card.KayitNo; receipt.YemekKartiAdi = card.Ad; }
+        if (account is not null)
+        {
+            AccountEntry(account, "Adisyon", request.CariTutar, 0, receipt.KayitNo, receipt.MasaAdi, actor.Name);
+            receipt.CariHesapKayitNo = account.KayitNo; receipt.CariHesapAdi = account.Unvan;
+        }
         Recalculate(receipt); // Refreshes the VAT split after a discount.
 
         Log(actor, PaymentAction, $"{receipt.MasaAdi}: {(itemPayment ? "ürün bazında" : request.KismiOdeme ? "kısmi" : "tam")} ödeme",
@@ -837,10 +845,11 @@ public sealed partial class RestaurantRepository
         return tx;
     });
 
-    public List<MutfakSiparisDTO> Kitchen() => Read(() => _receipts.Where(r => !r.Kapali &&
+    // Quick (counter) sales are paid immediately but still wait in the kitchen until they are ready.
+    public List<MutfakSiparisDTO> Kitchen() => Read(() => _receipts.Where(r => (!r.Kapali || r.HizliSatis) &&
         r.Detaylar.Any(d => d.Miktar > _ready.GetValueOrDefault(d.KayitNo))).Select(r =>
         new MutfakSiparisDTO { BaslikKayitNo = r.KayitNo, MasaAdi = r.MasaAdi,
-            BolumAdi = Table(r.MasaKayitNo!.Value).RestorantBolumAdi, SiparisZamani = r.KayitTarihi,
+            BolumAdi = r.HizliSatis ? "Hızlı satış" : _tables.FirstOrDefault(t => t.MasaId == r.MasaKayitNo)?.RestorantBolumAdi, SiparisZamani = r.KayitTarihi,
             BeklemeSuresi = (int)Math.Max(0, (Now - r.KayitTarihi!.Value).TotalMinutes),
             Satirlar = r.Detaylar.Select(d => new MutfakSatirDTO { DetayKayitNo = d.KayitNo,
                 StokAdi = d.StokAdi, PorsiyonAdi = d.PorsiyonAdi, Miktar = d.Miktar,
@@ -892,7 +901,9 @@ public sealed partial class RestaurantRepository
     public AdisyonBaslikDTO MarkLineReady(long id, StaffActor actor) => Change(() =>
     {
         Permission(actor, StaffOperation.Kitchen);
-        var (receipt, line) = Line(id);
+        var receipt = _receipts.FirstOrDefault(r => r.Detaylar.Any(d => d.KayitNo == id)) ?? throw new ApiException(404, "Sipariş bulunamadı.");
+        Require(!receipt.Kapali || receipt.HizliSatis, "Kapalı adisyon değiştirilemez.", 409);
+        var line = receipt.Detaylar.Single(d => d.KayitNo == id);
         Require(_ready.GetValueOrDefault(id) < line.Miktar, "Ürün zaten hazır.", 409);
         _ready[id] = line.Miktar;
         return receipt;
@@ -903,7 +914,7 @@ public sealed partial class RestaurantRepository
         Permission(actor, StaffOperation.Kitchen);
         var receipt = _receipts.FirstOrDefault(r => r.KayitNo == receiptId)
             ?? throw new ApiException(404, "Adisyon bulunamadı.");
-        Require(!receipt.Kapali, "Kapalı adisyon hazırlanamaz.", 409);
+        Require(!receipt.Kapali || receipt.HizliSatis, "Kapalı adisyon hazırlanamaz.", 409);
         foreach (var row in receipt.Detaylar) _ready[row.KayitNo] = row.Miktar;
         return receipt;
     });
@@ -930,6 +941,7 @@ public sealed partial class RestaurantRepository
         var delivered = _deliveries.Where(d => d.TamamlanmaTarihi.HasValue && BusinessDate(d.TamamlanmaTarihi.Value) == date).ToList();
         var deliverySales = delivered.Sum(d => d.GenelToplam);
         var collections = DeliveryCollections(date);
+        var till = TillExtras(date);
         var products = closed.SelectMany(r => r.Detaylar).GroupBy(d => d.StokKayitNo).Select(g => new UrunSatisDTO {
             StokAdi = g.First().StokAdi, ToplamMiktar = g.Sum(d => d.Miktar), ToplamTutar = g.Sum(d => d.SatirTutari)
         }).OrderByDescending(p => p.ToplamMiktar).ToList();
@@ -964,7 +976,9 @@ public sealed partial class RestaurantRepository
             YemekKartiDagilimi = MealCardSummary(entries),
             PaketTahsilat = collections,
             KuryeOzeti = CourierSummary(date),
-            BeklenenKasaNakdi = cash + collections.Nakit
+            BeklenenKasaNakdi = cash + collections.Nakit + till.AccountCash + till.In - till.Out,
+            KasaGiris = till.In, KasaCikis = till.Out, CariTahsilatNakit = till.AccountCash, CariTahsilatBanka = till.AccountBank,
+            KasaHareketleri = till.Movements
         };
         return (report, products);
     }
@@ -1052,6 +1066,8 @@ public sealed partial class RestaurantRepository
         SeedDelivery();
         SeedStock();
         SeedOptions();
+        SeedAccounts();
+        SeedGuest();
         var waiter = new StaffActor(2, "Demo Garson", "Garson");
         AddOrder(new() { MasaKayitNo = 1, StokKayitNo = 4, Miktar = 2, SatirAciklama = "Az pişmiş" }, waiter);
         AddOrder(new() { MasaKayitNo = 1, StokKayitNo = 9, Miktar = 2 }, waiter);

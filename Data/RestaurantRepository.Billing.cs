@@ -216,11 +216,24 @@ public sealed partial class RestaurantRepository
         Require(request.Nakit + request.Banka + request.YemekKarti + request.Cari == oldNakit + oldBanka + oldYemek + oldCari,
             "Düzeltilen ödemelerin toplamı alınan tahsilatla aynı olmalı.");
         Require(request.Nakit != oldNakit || request.Banka != oldBanka || request.YemekKarti != oldYemek || request.Cari != oldCari ||
-            request.YemekKartiKayitNo != receipt.YemekKartiKayitNo, "Ödeme dağılımı değişmedi.");
+            request.YemekKartiKayitNo != receipt.YemekKartiKayitNo ||
+            (request.Cari > 0 && request.CariHesapKayitNo is not null && request.CariHesapKayitNo != receipt.CariHesapKayitNo),
+            "Ödeme dağılımı değişmedi.");
         var card = MealCard(request.YemekKarti, request.YemekKartiKayitNo);
+        var oldAccount = receipt.CariHesapKayitNo is long oldAccountId ? _accounts.FirstOrDefault(a => a.KayitNo == oldAccountId) : null;
+        var newAccountId = request.Cari > 0 ? request.CariHesapKayitNo ?? receipt.CariHesapKayitNo : null;
+        var newAccount = CheckAccountCharge(request.Cari, newAccountId, oldAccount is not null && oldAccount.KayitNo == newAccountId ? oldCari : 0);
         receipt.NakitToplam = request.Nakit; receipt.BankaToplam = request.Banka;
         receipt.YemekKartiToplam = request.YemekKarti; receipt.CariToplam = request.Cari;
         receipt.YemekKartiKayitNo = card?.KayitNo; receipt.YemekKartiAdi = card?.Ad;
+        // The cari debt follows the correction: the old charge is reversed and the new one booked.
+        if (oldAccount?.KayitNo != newAccount?.KayitNo || oldCari != request.Cari)
+        {
+            if (oldAccount is not null && oldCari > 0) AccountEntry(oldAccount, "Düzeltme", 0, oldCari, receipt.KayitNo, reason, actor.Name);
+            if (newAccount is not null) AccountEntry(newAccount, "Düzeltme", request.Cari, 0, receipt.KayitNo, reason, actor.Name);
+        }
+        receipt.CariHesapKayitNo = newAccount?.KayitNo ?? (request.Cari > 0 ? receipt.CariHesapKayitNo : null);
+        receipt.CariHesapAdi = newAccount?.Unvan ?? (request.Cari > 0 ? receipt.CariHesapAdi : null);
         _audit.Add(new IslemKaydiDTO { KayitNo = ++_nextAudit, Tarih = Now, Islem = PaymentCorrectionAction,
             Aciklama = $"{receipt.MasaAdi}: {reason}", AdisyonNo = receipt.KayitNo, PersonelId = actor.Id, PersonelAdi = actor.Name,
             Nakit = request.Nakit - oldNakit, Banka = request.Banka - oldBanka, YemekKarti = request.YemekKarti - oldYemek,
@@ -242,6 +255,8 @@ public sealed partial class RestaurantRepository
         Require(request.Banka <= (receipt.BankaToplam ?? 0) - receipt.Iadeler.Sum(i => i.Banka), "Banka iadesi, banka tahsilatından büyük olamaz.", 409);
         Require(request.YemekKarti <= (receipt.YemekKartiToplam ?? 0) - receipt.Iadeler.Sum(i => i.YemekKarti), "Yemek kartı iadesi, yemek kartı tahsilatından büyük olamaz.", 409);
         Require(request.Cari <= (receipt.CariToplam ?? 0) - receipt.Iadeler.Sum(i => i.Cari), "Cari iade, cari tahsilattan büyük olamaz.", 409);
+        if (request.Cari > 0 && receipt.CariHesapKayitNo is long refundAccountId && _accounts.FirstOrDefault(a => a.KayitNo == refundAccountId) is { } refundAccount)
+            AccountEntry(refundAccount, "İade", 0, request.Cari, receipt.KayitNo, reason, actor.Name);
         receipt.Iadeler.Add(new IadeKaydiDTO { KayitNo = ++_nextRefund, Tarih = Now, Nakit = request.Nakit, Banka = request.Banka,
             YemekKarti = request.YemekKarti, Cari = request.Cari, Gerekce = reason, PersonelId = actor.Id, PersonelAdi = actor.Name });
         _audit.Add(new IslemKaydiDTO { KayitNo = ++_nextAudit, Tarih = Now, Islem = RefundAction, Aciklama = $"{receipt.MasaAdi}: {reason}",

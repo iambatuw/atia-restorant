@@ -229,6 +229,7 @@ public class OdemeDuzeltRequest
     public decimal YemekKarti { get; set; }
     public decimal Cari { get; set; }
     public long? YemekKartiKayitNo { get; set; }
+    public long? CariHesapKayitNo { get; set; }
     public string Gerekce { get; set; } = "";
 }
 
