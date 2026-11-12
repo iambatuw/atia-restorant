@@ -53,6 +53,8 @@ public sealed partial class RestaurantRepository
         Require(notes.Count <= 30, "En fazla 30 hazır not tanımlanabilir.");
         Require(notes.Distinct(StringComparer.OrdinalIgnoreCase).Count() == notes.Count, "Hazır notlar birbirinden farklı olmalı.");
         _quickNotes = notes;
+        foreach (var product in _menu.SelectMany(category => category.Urunler))
+            product.HazirNotlar = (product.HazirNotlar ?? []).Where(note => notes.Contains(note, StringComparer.OrdinalIgnoreCase)).ToList();
         Log(actor, "Hazır notlar güncellendi", $"{notes.Count} not");
         return _quickNotes;
     });
@@ -199,4 +201,17 @@ public sealed partial class RestaurantRepository
             new() { KayitNo = 3, Ad = "Ticket Restaurant" }, new() { KayitNo = 4, Ad = "Setcard" }, new() { KayitNo = 5, Ad = "Metropol" }];
         _nextMealCard = 5;
     }
+
+    private static List<string> DefaultQuickNotes(string? name) => name switch
+    {
+        "Mercimek Çorbası" => ["Acısız", "Az tuzlu", "Paket yapılacak"],
+        "Çoban Salata" => ["Soğansız", "Az tuzlu", "Sossuz", "Ayrı tabakta", "Paket yapılacak"],
+        "Humus" => ["Acısız", "Az tuzlu", "Ayrı tabakta", "Paket yapılacak"],
+        "Izgara Köfte" => ["Az pişmiş", "İyi pişmiş", "Az tuzlu", "Sossuz", "Paket yapılacak"],
+        "Tavuk Şiş" => ["İyi pişmiş", "Az tuzlu", "Sossuz", "Paket yapılacak"],
+        "Sebzeli Makarna" => ["Acısız", "Az tuzlu", "Sossuz", "Paket yapılacak"],
+        "Künefe" or "Sütlaç" => ["Ayrı tabakta", "Paket yapılacak"],
+        "Türk Kahvesi" => ["Paket yapılacak"],
+        _ => []
+    };
 }

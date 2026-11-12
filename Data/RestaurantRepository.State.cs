@@ -56,6 +56,11 @@ public sealed partial class RestaurantRepository
             foreach (var field in StateFields())
                 if (fields[field.Name] is { } node) values.Add((field, node.Deserialize(field.FieldType, SnapshotJson)));
             foreach (var (field, value) in values) field.SetValue(this, value);
+            // Older saved menus have no per-product note list. Preserve configured products and
+            // populate only the original demo items, identified by their unchanged stock names.
+            foreach (var product in _menu.SelectMany(category => category.Urunler))
+                product.HazirNotlar ??= DefaultQuickNotes(product.StokAdi)
+                    .Where(note => _quickNotes.Contains(note, StringComparer.OrdinalIgnoreCase)).ToList();
         }
         catch (Exception exception) when (exception is JsonException or InvalidDataException or IOException
             or InvalidOperationException or NotSupportedException or FormatException)

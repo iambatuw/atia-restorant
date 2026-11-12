@@ -286,6 +286,7 @@ public class MenuUrunDTO
     public int KdvOrani { get; set; } = 10;
     public string? Barkod { get; set; }
     public List<SecenekGrubuDTO> SecenekGruplari { get; set; } = new();
+    public List<string>? HazirNotlar { get; set; }
     public List<ReceteSatiriDTO> Recete { get; set; } = new();
 }
 
@@ -303,6 +304,7 @@ public class MenuUrunYazRequest
     public int KdvOrani { get; set; } = 10;
     public string? Barkod { get; set; }
     public List<SecenekGrubuDTO>? SecenekGruplari { get; set; }
+    public List<string>? HazirNotlar { get; set; }
 }
 
 public class PorsiyonDTO

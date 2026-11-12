@@ -32,6 +32,7 @@
 .op-chip { min-height: 40px; padding: 0 13px; border: 1px solid var(--op-line); border-radius: 999px; background: var(--op-paper); color: var(--op-ink); font-size: 13px; }
 .op-chip[aria-pressed="true"] { border-color: var(--op-accent); background: var(--op-accent-soft); color: var(--op-accent); font-weight: 700; }
 .op-chip small { margin-left: 5px; color: var(--op-muted); font-size: 11px; }
+.op-quick-note-options label { min-height: 44px; padding: 7px 12px; border: 1px solid var(--op-line); border-radius: 8px; cursor: pointer; }
 
 .op-option-panel { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--op-accent); border-radius: 9px; background: var(--op-paper); }
 .op-option-panel > header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }

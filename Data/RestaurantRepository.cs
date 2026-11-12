@@ -244,10 +244,15 @@ public sealed partial class RestaurantRepository
             ?? throw new ApiException(404, "Ürün bulunamadı.") : null;
         // Omitted option groups keep the current ones so older clients do not erase them.
         var optionGroups = request.SecenekGruplari is null ? previous?.SecenekGruplari ?? [] : NormalizeOptionGroups(request.SecenekGruplari);
+        var quickNotes = request.HazirNotlar is null ? previous?.HazirNotlar ?? [] : request.HazirNotlar
+            .Select(note => Mandatory(note, 40, "Hazır not")).ToList();
+        Require(quickNotes.Count <= _quickNotes.Count && quickNotes.Distinct(StringComparer.OrdinalIgnoreCase).Count() == quickNotes.Count &&
+            quickNotes.All(note => _quickNotes.Contains(note, StringComparer.OrdinalIgnoreCase)), "Ürüne yalnızca tanımlı ve farklı hazır notlar atanabilir.");
         var product = previous ?? new MenuUrunDTO { KayitNo = ++_nextProduct, StokKodu = $"U{_nextProduct:000}", Birimi = "Adet" };
         product.StokAdi = request.StokAdi.Trim(); product.SatisFiyati = request.SatisFiyati;
         product.GrupKayitNo = category.KayitNo; product.GrupAdi = category.GrupAdi; product.Aktif = request.Aktif;
         product.KdvOrani = request.KdvOrani; product.Barkod = barcode; product.SecenekGruplari = optionGroups;
+        product.HazirNotlar = quickNotes.Select(note => _quickNotes.First(item => string.Equals(item, note, StringComparison.OrdinalIgnoreCase))).ToList();
         product.Porsiyonlar = portions.Select(p => new PorsiyonDTO
             { KayitNo = ++_nextPortion, PorsiyonAdi = p.PorsiyonAdi!.Trim(), Fiyat = p.Fiyat, Carpan = p.Carpan }).ToList();
         if (previous is not null) _menu.Single(c => c.Urunler.Contains(previous)).Urunler.Remove(previous);
@@ -1031,7 +1036,8 @@ public sealed partial class RestaurantRepository
             for (var p = 0; p < names[c].Length; p++)
             {
                 var product = new MenuUrunDTO { KayitNo = ++productId, StokKodu = $"U{productId:000}", StokAdi = names[c][p],
-                    SatisFiyati = prices[c][p], Birimi = "Adet", GrupKayitNo = category.KayitNo, GrupAdi = category.GrupAdi, Aktif = true };
+                    SatisFiyati = prices[c][p], Birimi = "Adet", GrupKayitNo = category.KayitNo, GrupAdi = category.GrupAdi, Aktif = true,
+                    HazirNotlar = DefaultQuickNotes(names[c][p]) };
                 if (c == 1) product.Porsiyonlar = [new() { KayitNo = (int)productId * 10, PorsiyonAdi = "Tam", Fiyat = product.SatisFiyati },
                     new() { KayitNo = (int)productId * 10 + 1, PorsiyonAdi = "Yarım", Fiyat = product.SatisFiyati * 0.6m }];
                 category.Urunler.Add(product);

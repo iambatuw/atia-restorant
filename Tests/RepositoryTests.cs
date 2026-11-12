@@ -123,6 +123,31 @@ public sealed class RepositoryTests
     }
 
     [Fact]
+    public void QuickNotesAreAssignedToProductsAndOnlyConfiguredNotesCanBeSaved()
+    {
+        var repository = Repository();
+        var coffee = repository.Menu().SelectMany(category => category.Urunler)
+            .Single(product => product.StokAdi == "Türk Kahvesi");
+        var salad = repository.Menu().SelectMany(category => category.Urunler)
+            .Single(product => product.StokAdi == "Çoban Salata");
+        Assert.Equal(["Paket yapılacak"], coffee.HazirNotlar);
+        Assert.DoesNotContain("Soğansız", coffee.HazirNotlar!);
+        Assert.DoesNotContain("Acısız", coffee.HazirNotlar!);
+        Assert.Contains("Soğansız", salad.HazirNotlar!);
+
+        var request = new MenuUrunYazRequest { GrupKayitNo = coffee.GrupKayitNo!.Value,
+            StokAdi = coffee.StokAdi!, SatisFiyati = coffee.SatisFiyati, KdvOrani = coffee.KdvOrani,
+            Porsiyonlar = coffee.Porsiyonlar, HazirNotlar = ["Paket yapılacak"] };
+        Assert.Equal(403, Assert.Throws<ApiException>(() => repository.SaveProduct(coffee.KayitNo, request, Waiter)).Status);
+        request.HazirNotlar = ["Soğanlı"];
+        Assert.Equal(400, Assert.Throws<ApiException>(() => repository.SaveProduct(coffee.KayitNo, request, Admin)).Status);
+        request.HazirNotlar = ["Paket yapılacak"];
+        repository.SaveProduct(coffee.KayitNo, request, Admin);
+        Assert.Equal(["Paket yapılacak"], repository.Menu().SelectMany(category => category.Urunler)
+            .Single(product => product.KayitNo == coffee.KayitNo).HazirNotlar);
+    }
+
+    [Fact]
     public void DeliveryUsesMenuPricesAndRejectsDuplicateOrInvalidStatusChanges()
     {
         var repository = Repository();
