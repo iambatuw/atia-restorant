@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Printer,
   FileText,
-  ScanLine
+  ScanLine,
+  UsersRound
 } from 'lucide-react';
 import type {Account,Category,FullSettings,MealCard,OrderLine,Product,Receipt,ReceiptLocation,Section,Session,Table,PosCihazTipi,PosIslemKayit} from './types';
 import {
@@ -282,31 +283,28 @@ function TableOrder({table,admin,allTables,close,picker,onOpenPicker,onClosePick
         </button>
 
         {order&&(
-          <div className="receipt-calc-table">
-            <div className="calc-row grand-total">
-              <span className="grand-label">Ödenecek Tutar</span>
-              <strong className="grand-val">{money(order.GenelToplam)}</strong>
+          <div className="op-bill-summary">
+            <div className="op-bill-total">
+              <span>Ödenecek tutar</span>
+              <strong>{money(order.GenelToplam)}</strong>
             </div>
-          </div>
-        )}
-
-        {order&&(
-          <div className="op-guest-control">
-            <span>Kişi sayısı</span>
-            <span className="op-stepper">
-              <button type="button" aria-label="Kişi sayısını azalt" disabled={busy||order.KisiSayisi<=1}
-                onClick={()=>mutation.mutate({path:`/masalar/${table.MasaId}/kisi-sayisi`,method:'PATCH',body:{KisiSayisi:order.KisiSayisi-1}})}><Minus size={15}/></button>
-              <strong>{order.KisiSayisi}</strong>
-              <button type="button" aria-label="Kişi sayısını artır" disabled={busy||order.KisiSayisi>=50}
-                onClick={()=>mutation.mutate({path:`/masalar/${table.MasaId}/kisi-sayisi`,method:'PATCH',body:{KisiSayisi:order.KisiSayisi+1}})}><Plus size={15}/></button>
-            </span>
-            <button type="button" className="secondary" disabled={busy||printMark.isPending||order.Detaylar.length===0}
-              onClick={()=>printMark.mutate(order.KayitNo)} title="Müşteriye bilgi fişi yazdır">
-              <Printer size={15}/> <span>Adisyonu yazdır</span>
-            </button>
-            <button type="button" className="secondary" disabled={busy} onClick={()=>setInvoice(true)} title="Fişe firma bilgisi yaz">
-              <FileText size={15}/> <span>{order.FaturaBilgisi?'Fatura bilgisi ✓':'Fatura bilgisi'}</span>
-            </button>
+            <div className="op-bill-tools">
+              <div className="op-guest-pill" role="group" aria-label="Kişi sayısı">
+                <button type="button" aria-label="Kişi sayısını azalt" disabled={busy||order.KisiSayisi<=1}
+                  onClick={()=>mutation.mutate({path:`/masalar/${table.MasaId}/kisi-sayisi`,method:'PATCH',body:{KisiSayisi:order.KisiSayisi-1}})}><Minus size={14}/></button>
+                <span><UsersRound size={14}/><strong>{order.KisiSayisi}</strong> kişi</span>
+                <button type="button" aria-label="Kişi sayısını artır" disabled={busy||order.KisiSayisi>=50}
+                  onClick={()=>mutation.mutate({path:`/masalar/${table.MasaId}/kisi-sayisi`,method:'PATCH',body:{KisiSayisi:order.KisiSayisi+1}})}><Plus size={14}/></button>
+              </div>
+              <button type="button" className="op-bill-tool" disabled={busy||printMark.isPending||order.Detaylar.length===0}
+                onClick={()=>printMark.mutate(order.KayitNo)} title="Müşteriye bilgi fişi yazdır" aria-label="Adisyonu yazdır">
+                <Printer size={15}/><span>Yazdır</span>
+              </button>
+              <button type="button" className={`op-bill-tool ${order.FaturaBilgisi?'is-set':''}`} disabled={busy} onClick={()=>setInvoice(true)}
+                title="Fişe firma bilgisi yaz" aria-label={order.FaturaBilgisi?'Fatura bilgisi girildi':'Fatura bilgisi'}>
+                <FileText size={15}/><span>{order.FaturaBilgisi?'Fatura ✓':'Fatura'}</span>
+              </button>
+            </div>
           </div>
         )}
         <ErrorBox error={printMark.error}/>
@@ -508,25 +506,27 @@ function TableProductPicker({table,onClose}:{table:Table;onClose:()=>void}){
         <button type="button" aria-pressed={category===null} onClick={()=>{setCategory(null);setPortionProduct(null);setOptionTarget(null);setSimpleTarget(null);setNote('');}}>Tümü</button>
         {categories.map(item=><button type="button" key={item.KayitNo} aria-pressed={category===item.KayitNo} onClick={()=>{setCategory(item.KayitNo);setPortionProduct(null);setOptionTarget(null);setSimpleTarget(null);setNote('');}}>{item.GrupAdi}</button>)}
       </div>
-      <div className="table-product-options">
-        {selectedProduct&&<label>{selectedProduct.StokAdi} için not<input maxLength={250} value={note} onChange={event=>setNote(event.target.value)} placeholder="İsteğe bağlı not yazın"/></label>}
-        {quickNotes.length>0&&<div className="op-chip-row" role="group" aria-label={`${selectedProduct?.StokAdi} için hazır notlar`}>{quickNotes.map(item=><button type="button" key={item} className="op-chip"
-          aria-pressed={note.split(',').some(part=>part.trim().toLocaleLowerCase('tr')===item.toLocaleLowerCase('tr'))}
-          onClick={()=>setNote(current=>toggleQuickNote(current,item).slice(0,250))}>{item}</button>)}</div>}
-        <div className="table-product-quantity" role="group" aria-label="Seçilecek adet"><span>Adet</span><button type="button" aria-label="Adedi azalt" disabled={quantity===1||confirm.isPending} onClick={()=>setQuantity(value=>value-1)}><Minus size={19}/></button><strong>{quantity}</strong><button type="button" aria-label="Adedi artır" disabled={quantity===50||confirm.isPending} onClick={()=>setQuantity(value=>value+1)}><Plus size={19}/></button></div>
-      </div>
     </div>
     <ErrorBox error={menu.error||confirm.error} retry={menu.error?()=>void menu.refetch():undefined}/>
-    {portionProduct&&<section className="table-product-portions" aria-label={`${portionProduct.StokAdi} porsiyonları`}>
-      <div><strong>{portionProduct.StokAdi}</strong><span>Porsiyon seçin</span></div>
-       <div>{portionProduct.Porsiyonlar.map(portion=><button type="button" key={portion.KayitNo} disabled={confirm.isPending||draft.length>=50} onClick={()=>choosePortion(portionProduct,portion.KayitNo)}><span>{portion.PorsiyonAdi}</span><b>{money(portion.Fiyat)}</b></button>)}</div>
-      <button type="button" className="table-product-portions-cancel" onClick={()=>setPortionProduct(null)}>Vazgeç</button>
+    {selectedProduct&&<section className="table-product-selection" aria-label={`${selectedProduct.StokAdi} seçimi`}>
+      <div className="table-product-selection-row">
+        {simpleTarget&&<div className="table-product-selection-name"><strong>{simpleTarget.product.StokAdi}</strong>{simpleTarget.portionId&&<span>{simpleTarget.product.Porsiyonlar.find(item=>item.KayitNo===simpleTarget.portionId)?.PorsiyonAdi}</span>}</div>}
+        <input className="table-product-note" maxLength={250} value={note} onChange={event=>setNote(event.target.value)} placeholder={simpleTarget?'Not (isteğe bağlı)':`${selectedProduct.StokAdi} için not (isteğe bağlı)`} aria-label={`${selectedProduct.StokAdi} için not`}/>
+        <div className="table-product-quantity" role="group" aria-label="Seçilecek adet"><span>Adet</span><button type="button" aria-label="Adedi azalt" disabled={quantity===1||confirm.isPending} onClick={()=>setQuantity(value=>value-1)}><Minus size={17}/></button><strong>{quantity}</strong><button type="button" aria-label="Adedi artır" disabled={quantity===50||confirm.isPending} onClick={()=>setQuantity(value=>value+1)}><Plus size={17}/></button></div>
+        {simpleTarget&&<div className="table-product-selection-actions"><button type="button" className="secondary" onClick={()=>{setSimpleTarget(null);setNote('');}}>Vazgeç</button><button type="button" className="primary" disabled={confirm.isPending||draft.length>=50} onClick={()=>addToDraft(simpleTarget.product,simpleTarget.portionId)}>Seçime ekle</button></div>}
+      </div>
+      {quickNotes.length>0&&<div className="op-chip-row table-product-quick-notes" role="group" aria-label={`${selectedProduct.StokAdi} için hazır notlar`}>{quickNotes.map(item=><button type="button" key={item} className="op-chip"
+        aria-pressed={note.split(',').some(part=>part.trim().toLocaleLowerCase('tr')===item.toLocaleLowerCase('tr'))}
+        onClick={()=>setNote(current=>toggleQuickNote(current,item).slice(0,250))}>{item}</button>)}</div>}
+      {portionProduct&&<section className="table-product-portions" aria-label={`${portionProduct.StokAdi} porsiyonları`}>
+        <div><strong>{portionProduct.StokAdi}</strong><span>Porsiyon seçin</span></div>
+         <div>{portionProduct.Porsiyonlar.map(portion=><button type="button" key={portion.KayitNo} disabled={confirm.isPending||draft.length>=50} onClick={()=>choosePortion(portionProduct,portion.KayitNo)}><span>{portion.PorsiyonAdi}</span><b>{money(portion.Fiyat)}</b></button>)}</div>
+        <button type="button" className="table-product-portions-cancel" onClick={()=>setPortionProduct(null)}>Vazgeç</button>
+      </section>}
+      {optionTarget&&<OptionChooser key={`${optionTarget.product.KayitNo}-${optionTarget.portionId??0}`} product={optionTarget.product}
+        basePrice={optionTarget.product.Porsiyonlar.find(item=>item.KayitNo===optionTarget.portionId)?.Fiyat??optionTarget.product.SatisFiyati}
+         disabled={confirm.isPending||draft.length>=50} onCancel={()=>{setOptionTarget(null);setNote('');}} onConfirm={ids=>addToDraft(optionTarget.product,optionTarget.portionId,ids)}/>}
     </section>}
-    {optionTarget&&<OptionChooser key={`${optionTarget.product.KayitNo}-${optionTarget.portionId??0}`} product={optionTarget.product}
-      basePrice={optionTarget.product.Porsiyonlar.find(item=>item.KayitNo===optionTarget.portionId)?.Fiyat??optionTarget.product.SatisFiyati}
-       disabled={confirm.isPending||draft.length>=50} onCancel={()=>{setOptionTarget(null);setNote('');}} onConfirm={ids=>addToDraft(optionTarget.product,optionTarget.portionId,ids)}/>}
-    {simpleTarget&&<section className="op-option-panel" aria-label={`${simpleTarget.product.StokAdi} seçimi`}><header><strong>{simpleTarget.product.StokAdi}</strong><span>Not ve adedi kontrol edin</span></header>
-      <footer><button type="button" className="secondary" onClick={()=>{setSimpleTarget(null);setNote('');}}>Vazgeç</button><button type="button" className="primary" disabled={confirm.isPending||draft.length>=50} onClick={()=>addToDraft(simpleTarget.product,simpleTarget.portionId)}>Seçime ekle</button></footer></section>}
     <div className="table-product-catalog" aria-label="Menü ürünleri">
       {menu.isPending?<Loading/>:products.length===0?<Empty>Bu aramada ürün bulunamadı.</Empty>:
         <div className="table-product-grid">{products.map(product=><button type="button" key={product.KayitNo} className="table-product-card" aria-pressed={selectedProduct?.KayitNo===product.KayitNo} disabled={confirm.isPending||draft.length>=50} onClick={()=>chooseProduct(product)}><span>{product.GrupAdi}</span><strong>{product.StokAdi}</strong><span className="table-product-card-bottom"><b>{money(product.SatisFiyati)}</b><Plus size={21} aria-hidden="true"/></span>{product.Porsiyonlar.length>0&&<small>{product.Porsiyonlar.length} porsiyon seçeneği</small>}{(product.SecenekGruplari?.length??0)>0&&<small>{product.SecenekGruplari!.some(group=>group.Zorunlu)?'Seçim gerekli':'Ekstra seçenekli'}</small>}</button>)}</div>}
