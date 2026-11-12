@@ -167,20 +167,20 @@ export default function App(){
   }
 
   const nav=[
-    {id:'genel-bakis',label:'Genel bakış',icon:LayoutDashboard,allowed:session.Rol==='Admin'},
-    {id:'masalar',label:'Masalar',icon:Armchair,allowed:session.Rol!=='Mutfak'},
-    {id:'paket-servis',label:'Paket servis',icon:Truck,allowed:session.Rol!=='Mutfak'},
-    {id:'hizli-satis',label:'Hızlı satış',icon:ShoppingBag,allowed:session.Rol==='Admin'},
-    {id:'mutfak',label:'Mutfak',icon:ChefHat,allowed:session.Rol!=='Garson'},
-    {id:'menu',label:'Menü',icon:BookOpen,allowed:true},
-    {id:'raporlar',label:'Raporlar',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
-    {id:'adisyonlar',label:'Adisyonlar',icon:ReceiptText,allowed:session.Rol==='Admin'},
-    {id:'kasa',label:'Kasa ve cari',icon:Landmark,allowed:session.Rol==='Admin'},
-    {id:'stok',label:'Stok ve maliyet',icon:Boxes,allowed:session.Rol==='Admin'},
-    {id:'personel',label:'Personel',icon:UsersRound,allowed:session.Rol==='Admin'},
-    {id:'entegrasyonlar',label:'Entegrasyonlar',icon:PlugZap,allowed:session.Rol==='Admin'},
-    {id:'rezervasyonlar',label:'Rezervasyonlar',icon:CalendarDays,allowed:session.Rol==='Admin'},
-    {id:'ayarlar',label:'Ayarlar',icon:Settings2,allowed:session.Rol==='Admin'}
+    {id:'genel-bakis',group:'Operasyon',label:'Genel bakış',icon:LayoutDashboard,allowed:session.Rol==='Admin'},
+    {id:'masalar',group:'Operasyon',label:'Masalar',icon:Armchair,allowed:session.Rol!=='Mutfak'},
+    {id:'paket-servis',group:'Operasyon',label:'Paket servis',icon:Truck,allowed:session.Rol!=='Mutfak'},
+    {id:'hizli-satis',group:'Operasyon',label:'Hızlı satış',icon:ShoppingBag,allowed:session.Rol==='Admin'},
+    {id:'mutfak',group:'Operasyon',label:'Mutfak',icon:ChefHat,allowed:session.Rol!=='Garson'},
+    {id:'menu',group:'Operasyon',label:'Menü',icon:BookOpen,allowed:true},
+    {id:'raporlar',group:'Yönetim',label:'Raporlar',icon:ChartNoAxesCombined,allowed:session.Rol==='Admin'},
+    {id:'adisyonlar',group:'Yönetim',label:'Adisyonlar',icon:ReceiptText,allowed:session.Rol==='Admin'},
+    {id:'kasa',group:'Yönetim',label:'Kasa ve cari',icon:Landmark,allowed:session.Rol==='Admin'},
+    {id:'stok',group:'Yönetim',label:'Stok ve maliyet',icon:Boxes,allowed:session.Rol==='Admin'},
+    {id:'personel',group:'Yönetim',label:'Personel',icon:UsersRound,allowed:session.Rol==='Admin'},
+    {id:'entegrasyonlar',group:'Sistem',label:'Entegrasyonlar',icon:PlugZap,allowed:session.Rol==='Admin'},
+    {id:'rezervasyonlar',group:'Sistem',label:'Rezervasyonlar',icon:CalendarDays,allowed:session.Rol==='Admin'},
+    {id:'ayarlar',group:'Sistem',label:'Ayarlar',icon:Settings2,allowed:session.Rol==='Admin'}
   ];
   const page:Page=requested&&canAccess(requested,session.Rol)?requested:defaultPage(session.Rol);
   const current=nav.find(n=>n.id===page)!;
@@ -189,20 +189,20 @@ export default function App(){
     <div className="op-app">
       <aside className="op-sidebar">
         <div className="op-brand"><strong>ATIA</strong><span>Restoran</span></div>
-        <p className="op-nav-label">Çalışma alanı</p>
         <nav aria-label="Ana menü" className="op-nav">
-          {nav.filter(n=>n.allowed).map(n=>(
+          {nav.filter(n=>n.allowed).map((n,i,list)=>[
+            i===0||list[i-1].group!==n.group?<p key={`g-${n.group}`} className={`op-nav-label ${i>0?'op-nav-group':''}`}>{n.group}</p>:null,
             <a
               key={n.id}
               href={pagePath(n.id as Page)}
               aria-current={page===n.id?'page':undefined}
-              className={`op-nav-item ${page===n.id?'active':''} ${n.id==='rezervasyonlar'?'op-nav-secondary':''}`}
+              className={`op-nav-item ${page===n.id?'active':''}`}
               onClick={e=>{if(e.button===0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey){e.preventDefault();setMobileMenuOpen(false);navigate(pagePath(n.id as Page));}}}
             >
               <n.icon size={19}/>
               <span>{n.label}</span>
             </a>
-          ))}
+          ])}
         </nav>
         <div className="op-sidebar-bottom">
           <a className="op-public-link" href="/menu" target="_blank" rel="noreferrer"><BookOpen size={17}/> Müşteri menüsü <ArrowUpRight size={15}/></a>
