@@ -148,16 +148,16 @@
 .op-bill-total span { color: var(--op-muted); font-size: 13px; font-weight: 600; }
 .op-bill-total strong { font-size: 22px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .op-bill-tools { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-.op-app .op-guest-pill { display: flex; align-items: center; justify-content: space-between; min-width: 0; height: 40px; padding: 0 3px; border: 1px solid var(--op-line); border-radius: 8px; background: var(--op-paper); }
-.op-app .op-guest-pill button { display: grid; flex: none; place-items: center; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--op-ink); }
+.op-app .op-guest-pill { display: flex; align-items: center; justify-content: space-between; min-width: 0; height: 52px; padding: 0 3px; border: 1px solid var(--op-line); border-radius: 8px; background: var(--op-paper); }
+.op-app .op-guest-pill button { display: grid; flex: none; place-items: center; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--op-ink); }
 .op-app .op-guest-pill button:hover:not(:disabled) { background: var(--op-accent-soft); color: var(--op-accent); }
-.op-guest-pill > span { display: inline-flex; align-items: center; gap: 5px; overflow: hidden; color: var(--op-muted); font-size: 13px; white-space: nowrap; }
+.op-guest-pill > span { display: inline-flex; align-items: center; gap: 5px; overflow: hidden; color: var(--op-muted); font-size: 14px; white-space: nowrap; }
 .op-guest-pill > span strong { color: var(--op-ink); font-variant-numeric: tabular-nums; }
 .op-app .op-bill-tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: 40px; min-height: 40px; padding: 0 8px; border: 1px solid var(--op-line); border-radius: 8px; background: var(--op-paper); color: var(--op-ink); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .op-app .op-bill-tool span { overflow: hidden; text-overflow: ellipsis; }
 .op-app .op-bill-tool:hover:not(:disabled) { border-color: var(--op-accent); color: var(--op-accent); }
 .op-app .op-bill-tool.is-set { border-color: var(--op-accent); color: var(--op-accent); }
-@container (max-width: 340px) { .op-bill-tools { grid-template-columns: 1fr 1fr; } .op-app .op-guest-pill { grid-column: 1 / -1; } }
+@container (max-width: 470px) { .op-bill-tools { grid-template-columns: 1fr 1fr; } .op-app .op-guest-pill { grid-column: 1 / -1; } }
 
 /* Product picker: one compact selection strip so the catalog keeps its room */
 .table-product-dialog .table-product-tools { gap: 10px; padding-bottom: 12px; }

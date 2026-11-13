@@ -20,7 +20,8 @@ import {
   Boxes,
   UsersRound,
   Landmark,
-  ShoppingBag
+  ShoppingBag,
+  ChevronDown
 } from 'lucide-react';
 import type {Health,Session} from './types';
 import {api,ApiError,setToken} from './api';
@@ -66,7 +67,27 @@ export default function App(){
   const generation=useRef(0);
   const [currentTime,setCurrentTime]=useState(getFormattedTime());
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
+  const [openNavGroup,setOpenNavGroup]=useState<string|null>(null);
+  const sidebarRef=useRef<HTMLElement>(null);
+  const mobileMenuRef=useRef<HTMLElement>(null);
+  const moreButtonRef=useRef<HTMLButtonElement>(null);
   const client=useQueryClient();
+
+  useEffect(()=>{
+    if(!openNavGroup&&!mobileMenuOpen)return;
+    const onOutside=(event:PointerEvent)=>{
+      const target=event.target as Node;
+      if(sidebarRef.current?.contains(target)||mobileMenuRef.current?.contains(target)||moreButtonRef.current?.contains(target))return;
+      setOpenNavGroup(null);
+      setMobileMenuOpen(false);
+    };
+    const onEscape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){setOpenNavGroup(null);setMobileMenuOpen(false);}
+    };
+    document.addEventListener('pointerdown',onOutside);
+    document.addEventListener('keydown',onEscape);
+    return()=>{document.removeEventListener('pointerdown',onOutside);document.removeEventListener('keydown',onEscape);};
+  },[openNavGroup,mobileMenuOpen]);
 
   useEffect(()=>{
     const timer=setInterval(()=>setCurrentTime(getFormattedTime()),1000);
@@ -80,6 +101,8 @@ export default function App(){
     setSession(null);
     setRestoring(false);
     setRestoreError(false);
+    setMobileMenuOpen(false);
+    setOpenNavGroup(null);
     client.clear();
     navigate('/login',true);
   },[client,navigate]);
@@ -184,26 +207,38 @@ export default function App(){
   ];
   const page:Page=requested&&canAccess(requested,session.Rol)?requested:defaultPage(session.Rol);
   const current=nav.find(n=>n.id===page)!;
+  const visibleNav=nav.filter(item=>item.allowed);
+  const navGroups=[{label:'Operasyon',icon:LayoutDashboard},{label:'Yönetim',icon:ChartNoAxesCombined},{label:'Sistem',icon:Settings2}];
+  const groupedLinks=(mobile:boolean)=>navGroups.map(group=>{
+    const links=visibleNav.filter(item=>item.group===group.label);
+    if(!links.length)return null;
+    const expanded=openNavGroup===group.label;
+    const panelId=`${mobile?'mobile':'desktop'}-${group.label.toLocaleLowerCase('tr')}`;
+    return <section className="op-nav-section" key={group.label}>
+      <button type="button" className="op-nav-group-trigger" aria-expanded={expanded} aria-controls={panelId}
+        aria-label={`${group.label} menüsü`} title={group.label}
+        onClick={()=>setOpenNavGroup(currentGroup=>currentGroup===group.label?null:group.label)}>
+        <group.icon size={19}/><span>{group.label}</span><ChevronDown className="op-nav-chevron" size={17}/>
+      </button>
+      {expanded&&<div id={panelId} className="op-nav-children">{links.map(item=><a key={item.id} href={pagePath(item.id as Page)}
+        aria-current={page===item.id?'page':undefined} className={`op-nav-item ${page===item.id?'active':''}`}
+        title={item.label} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){
+          event.preventDefault();setOpenNavGroup(null);setMobileMenuOpen(false);navigate(pagePath(item.id as Page));
+        }}}><item.icon size={19}/><span>{item.label}</span></a>)}</div>}
+    </section>;
+  });
 
   return (
     <div className="op-app">
-      <aside className="op-sidebar">
+      <aside className="op-sidebar" ref={sidebarRef}>
         <div className="op-brand"><strong>ATIA</strong><span>Restoran</span></div>
         <nav aria-label="Ana menü" className="op-nav">
-          {nav.filter(n=>n.allowed).map((n,i,list)=>[
-            i===0||list[i-1].group!==n.group?<p key={`g-${n.group}`} className={`op-nav-label ${i>0?'op-nav-group':''}`}>{n.group}</p>:null,
-            <a
-              key={n.id}
-              href={pagePath(n.id as Page)}
-              aria-current={page===n.id?'page':undefined}
-              className={`op-nav-item ${page===n.id?'active':''}`}
-              onClick={e=>{if(e.button===0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey){e.preventDefault();setMobileMenuOpen(false);navigate(pagePath(n.id as Page));}}}
-            >
-              <n.icon size={19}/>
-              <span>{n.label}</span>
-            </a>
-          ])}
+          {groupedLinks(false)}
         </nav>
+        <nav className="op-mobile-bottom-nav" aria-label="Hızlı ekranlar">{visibleNav.slice(0,4).map(item=><a key={item.id}
+          href={pagePath(item.id as Page)} aria-current={page===item.id?'page':undefined} onClick={event=>{
+            if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();setOpenNavGroup(null);setMobileMenuOpen(false);navigate(pagePath(item.id as Page));}
+          }}><item.icon size={19}/><span>{item.label}</span></a>)}</nav>
         <div className="op-sidebar-bottom">
           <a className="op-public-link" href="/menu" target="_blank" rel="noreferrer"><BookOpen size={17}/> Müşteri menüsü <ArrowUpRight size={15}/></a>
           <div className="op-user"><span className="op-avatar">{session.TamAd.slice(0,1)}</span><div><strong>{session.TamAd}</strong><small>{session.Rol==='Admin'?'Yönetici':session.Rol}</small></div><button onClick={logout} aria-label="Oturumu kapat" title="Çıkış yap"><LogOut size={17}/></button></div>
@@ -217,7 +252,7 @@ export default function App(){
             <span className="op-clock"><Clock size={15}/>{currentTime}</span>
             <Realtime token={session.Token}/>
             <ThemeToggle/>
-            <button className="icon-button op-more-button" aria-label="Tüm ekranlar" aria-expanded={mobileMenuOpen} onClick={()=>setMobileMenuOpen(open=>!open)}><MoreHorizontal size={19}/></button>
+            <button ref={moreButtonRef} className="icon-button op-more-button" aria-label="Tüm ekranlar" aria-expanded={mobileMenuOpen} onClick={()=>{setOpenNavGroup(null);setMobileMenuOpen(open=>!open);}}><MoreHorizontal size={19}/></button>
             <button
               className="icon-button"
               aria-label="Verileri yenile"
@@ -235,7 +270,7 @@ export default function App(){
             </button>
           </div>
         </header>
-        {mobileMenuOpen&&<nav className="op-mobile-menu" aria-label="Tüm ekranlar menüsü">{nav.filter(n=>n.allowed).map(n=><a key={n.id} href={pagePath(n.id as Page)} aria-current={page===n.id?'page':undefined} onClick={e=>{if(e.button===0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey){e.preventDefault();setMobileMenuOpen(false);navigate(pagePath(n.id as Page));}}}><n.icon size={17}/>{n.label}</a>)}</nav>}
+        {mobileMenuOpen&&<nav ref={mobileMenuRef} className="op-mobile-menu" aria-label="Tüm ekranlar menüsü">{groupedLinks(true)}</nav>}
 
         {health.data?.Mode==='Demo'&&(
           <div className="op-demo-notice" role="status">
